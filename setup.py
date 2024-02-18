@@ -1,14 +1,16 @@
 import pickle
 
 """
-DATA:
+NAME:   (SIZE)
+---------------
+Data:    (80)
     Keys = "DAgger_XXX_GPS_0.db3"
-    Vals = <dict> L1
-L1:
-    Keys = <int> ID
-    Vals = <dict> L2
-L2:
-    Keys:
+    Vals (100+) = <dict> Bag
+Bag:
+    Key  (1)    = <int>  ID
+    Val  (1)    = <dict> Msg
+Msg:
+    Keys (15):
     "header"    = {'stamp': {'sec': int, 'nanosec': int}, 'frame_id': str}
     "t" (time)  = <FLOAT>
     "x" (pos)   = {'header': ..., 'x': <FLOAT>, 'y': <FLOAT>, 'z': ...}
@@ -27,57 +29,83 @@ L2:
 """
 DATA = pickle.load(open("data.pkl", "rb"))
 
+
 def print_keys():
     for data in DATA.items():
-        print(f"{sum([len(i) for i in DATA.values()])} messages seen.")
-        print(f"Data ({len(DATA)} items): Keys = {data[0]}, Vals = <dict> L1.")
+        print(f"\nData ({len(DATA)} items): Keys = {data[0]}, Vals = <dict> Bag.")
 
-        for L1 in data[1].items():
-            print(f"L1 ({len(data[1])} items): Keys = {L1[0]}, Vals = <dict> L2.")
-            print(f"\nL2 ({len(L1[1])} items): Keys =")
+        for bag in data[1].items():
+            print(f"Bag ({len(data[1])} items): Keys = {bag[0]}, Vals = <dict> Msg.")
+            print(f"Msg ({len(bag[1])} items):  Keys =\n")
 
-            for L2 in L1[1].items():
-                vals = L2[1]
+            for msg in bag[1].items():
+                vals = msg[1]
                 if isinstance(vals, dict):
                     vals = set(vals.keys())
-                print(f"{L2[0]} = {vals}")
-            exit()
+                print(f"{msg[0]} = {vals}")
+            return
+
 
 def parse_data():
     """
-    Returns DATA as a nested list:
-    list    = DATA rosbag dirs(80)
-    list[x] = L1 data bundles (>1)
-    list[x][y] = L2 data bundle(1)
-    list[x][y][z] = datapoint (12)
+    Returns nested list DATA:
+        data[x] = bag
+        data[x][y] = msg
+        data[x][y][z] = point
     """
-    list = []
-    for L1 in DATA.values():
-        nest = []
-        for L2 in L1.values():
-            nest.append([
-                L2["t"],            # 0. "t" (time)  = <FLOAT>
-                L2["x"]["x"],       # 1. "x" (pos)   = {'x',
-                L2["x"]["y"],       # 2.                'y'}
-                L2["e"]["psi"],     # 3. "e" (orient)= {'psi'}
-                L2["w"]["w_psi"],   # 4. "w" (ang.v) = {'w_psi'}
-                L2["aa"]["a_psi"],  # 5. "aa"(ang.a) = {'a_psi'}
-                L2["v"]["v_long"],  # 6. "v" (veloc) = {'v_long',
-                L2["v"]["v_tran"],  # 7.                'v_tran'}
-                L2["a"]["a_long"],  # 8. "a" (accel) = {'a_long',
-                L2["a"]["a_tran"],  # 9.                'a_tran'}
-                L2["u"]["u_a"],     # 10."u" (actuat)= {'u_a',
-                L2["u"]["u_steer"]  # 11.               'u_steer'}
+    data = []
+    for B in DATA.values():
+        bag = []
+        for M in B.values():
+            bag.append([
+                M["t"],             # 0. "t" (time)  = <FLOAT>
+                M["x"]["x"],        # 1. "x" (pos)   = {'x',
+                M["x"]["y"],        # 2.                'y'}
+                M["e"]["psi"],      # 3. "e" (orient)= {'psi'}
+                M["w"]["w_psi"],    # 4. "w" (ang.v) = {'w_psi'}
+            #   M["aa"]["a_psi"],   # _. "aa"(ang.a) = {'a_psi'}
+                M["v"]["v_long"],   # 5. "v" (veloc) = {'v_long',
+                M["v"]["v_tran"],   # 6.                'v_tran'}
+            #   M["a"]["a_long"],   # _. "a" (accel) = {'a_long',
+            #   M["a"]["a_tran"],   # _.                'a_tran'}
+                M["u"]["u_a"],      # 7."u" (actuat)= {'u_a',
+                M["u"]["u_steer"]   # 8.               'u_steer'}
             ])
-        list.append(nest)
+        data.append(sorted(bag, key = lambda msg: msg[0]))
 
-    size = lambda func: sum([func([len(i) for i in nest]) for nest in list])
-    print(f"\n{len(list)} rosbags, {size(len)} messages, and {size(sum)} datapoints parsed.")
-    return list
+    size = lambda func: sum([func([len(msg) for msg in bag]) for bag in data])
+    print(f"\n{len(data)} rosbags, {size(len)} messages, and {size(sum)} datapoints parsed.")
+    return data
 
-def prune_data():
-    return
+
+def prune_data(data, stops=True, ends=True):
+    """
+    Returns pruned data list:
+    if stops: removes points
+        if all(w,v,u) < 0.01
+    if ends: removes points
+        within 1s of msg end
+    Flattens data list to 2D
+    """
+    # Adjust bounds as needed
+    near_0 = lambda msg: all([abs(pt) < 0.01 for pt in msg])
+
+    prune = []
+    for bag in data:
+        max_t = max([msg[0] for msg in bag]) - 1.00
+
+        for msg in bag:
+            if stops and near_0(msg[4:]): # (w,v,u)
+                continue
+            if ends and msg[0] > max_t:
+                continue
+            prune.append(msg)
+
+    print(f"\n{len(prune)} messages and {sum([len(msg) for msg in prune])} datapoints remain from pruning.")
+    return prune
+
 
 if __name__ == "__main__":
-    x = parse_data()
     print_keys()
+    data = parse_data()
+    data = prune_data(data)
