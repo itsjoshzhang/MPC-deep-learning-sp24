@@ -106,6 +106,18 @@ def prune_data(data, stops=True, ends=True):
 
 
 if __name__ == "__main__":
-    print_keys()
-    data = parse_data()
-    data = prune_data(data)
+    """
+    Original: messages    datapoints
+                64048       576432
+    w/ stops:   -998        -8982   (1.6)%
+    w/ ends:    -4041       -36369  (6.3)%
+    w/ both:    -5032       -45288  (7.9)%
+    """
+    if DATA:
+        print_keys()
+
+        data = parse_data()
+        pickle.dump(data, open("data_clean.pkl", "wb"))
+
+        data = prune_data(data)
+        pickle.dump(data, open("data_prune.pkl", "wb"))
