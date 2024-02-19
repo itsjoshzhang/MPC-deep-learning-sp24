@@ -27,8 +27,8 @@ Msg:
     "timing"    = {'step_start': ..., 'step_exec': ..., 'source': ..., 'publish': ...}
     "lap_num"   = ...
 """
-DATA = pickle.load(open("data.pkl", "rb"))
 
+DATA = pickle.load(open("data_old.pkl", "rb"))
 
 def print_keys():
     for data in DATA.items():
@@ -45,79 +45,56 @@ def print_keys():
                 print(f"{msg[0]} = {vals}")
             return
 
-
-def parse_data():
+def setup_data(CUT_TIME=1.00, BAG_SIZE=100, PAD=True):
     """
     Returns nested list DATA:
         data[x] = bag
         data[x][y] = msg
         data[x][y][z] = point
+    Removes msgs within 1 sec
+        of end of test/rosbag
+    Limits max length of bags
+        to 100, pruning extra
     """
-    data = []
-    for B in DATA.values():
-        bag = []
-        for M in B.values():
-            bag.append([
-                M["t"],             # 0. "t" (time)  = <FLOAT>
-                M["x"]["x"],        # 1. "x" (pos)   = {'x',
-                M["x"]["y"],        # 2.                'y'}
-                M["e"]["psi"],      # 3. "e" (orient)= {'psi'}
-                M["w"]["w_psi"],    # 4. "w" (ang.v) = {'w_psi'}
-            #   M["aa"]["a_psi"],   # _. "aa"(ang.a) = {'a_psi'}
-                M["v"]["v_long"],   # 5. "v" (veloc) = {'v_long',
-                M["v"]["v_tran"],   # 6.                'v_tran'}
-            #   M["a"]["a_long"],   # _. "a" (accel) = {'a_long',
-            #   M["a"]["a_tran"],   # _.                'a_tran'}
-                M["u"]["u_a"],      # 7."u" (actuat)= {'u_a',
-                M["u"]["u_steer"]   # 8.               'u_steer'}
-            ])
-        data.append(sorted(bag, key = lambda msg: msg[0]))
+    data_list = []
+    for bag in DATA.values():
+        bag_list = []
+                                                # sort by incr. msg[time]
+        bag_sort = sorted(bag.values(), key=lambda msg: msg["t"])
+        max_time = bag_sort[-1]["t"] - CUT_TIME # max cutoff time for bag
 
-    size = lambda func: sum([func([len(msg) for msg in bag]) for bag in data])
-    print(f"\n{len(data)} rosbags, {size(len)} messages, and {size(sum)} datapoints parsed.")
-    return data
+        for msg in bag_sort:
+            if msg["t"] <= max_time:
+                bag_list.append([
 
+                    msg["x"]["x"],          # 0. "x" (pos)   = {'x',
+                    msg["x"]["y"],          # 1.                'y'}
+                    msg["e"]["psi"],        # 2. "e" (orient)= {'psi'}
+                    msg["w"]["w_psi"],      # 3. "w" (ang.v) = {'w_psi'}
+                #   msg["aa"]["a_psi"],     # _. "aa"(ang.a) = {'a_psi'}
+                    msg["v"]["v_long"],     # 4. "v" (veloc) = {'v_long',
+                    msg["v"]["v_tran"],     # 5.                'v_tran'}
+                #   msg["a"]["a_long"],     # _. "a" (accel) = {'a_long',
+                #   msg["a"]["a_tran"],     # _.                'a_tran'}
+                    msg["u"]["u_a"],        # 6."u" (actuat)= {'u_a',
+                    msg["u"]["u_steer"]     # 7.               'u_steer'}
+                ])
+            if len(bag_list) == BAG_SIZE:   # Limit max length of bag
+                data_list.append(bag_list)  # @ BAG_SIZE, prune extra
+                bag_list = []
 
-def prune_data(data, stops=True, ends=True):
-    """
-    Returns pruned data list:
-    if stops: removes points
-        if all(w,v,u) < 0.01
-    if ends: removes points
-        within 1s of msg end
-    Flattens data list to 2D
-    """
-    # Adjust bounds as needed
-    near_0 = lambda msg: all([abs(pt) < 0.01 for pt in msg])
+        tol = 8 if PAD else 0               # allow bags near 100-tol
+        if len(bag_list) >= BAG_SIZE - tol: # pad to len 100 w/ zeros
 
-    prune = []
-    for bag in data:
-        max_t = max([msg[0] for msg in bag]) - 1.00
+            for _ in range(BAG_SIZE - len(bag_list)):
+                bag_list.append([0 for _ in range(tol)])
+            data_list.append(bag_list)
 
-        for msg in bag:
-            if stops and near_0(msg[4:]): # (w,v,u)
-                continue
-            if ends and msg[0] > max_t:
-                continue
-            prune.append(msg)
-
-    print(f"\n{len(prune)} messages and {sum([len(msg) for msg in prune])} datapoints remain from pruning.")
-    return prune
-
+    size = lambda func: sum([func([len(msg) for msg in bag]) for bag in data_list])
+    print(f"\n{len(data_list)} rosbags, {size(len)} messages, and {size(sum)} datapoints parsed.")
+    return data_list
 
 if __name__ == "__main__":
-    """
-    Original: messages    datapoints
-                64048       576432
-    w/ stops:   -998        -8982   (1.6)%
-    w/ ends:    -4041       -36369  (6.3)%
-    w/ both:    -5032       -45288  (7.9)%
-    """
-    if DATA:
-        print_keys()
-
-        data = parse_data()
-        pickle.dump(data, open("data_clean.pkl", "wb"))
-
-        data = prune_data(data)
-        pickle.dump(data, open("data_prune.pkl", "wb"))
+    data_old = setup_data(CUT_TIME=0.00, BAG_SIZE=1, PAD=False)
+    data_new = setup_data(CUT_TIME=1.00, BAG_SIZE=100, PAD=True)
+    pickle.dump(data_new, open("data_new.pkl", "wb"))
