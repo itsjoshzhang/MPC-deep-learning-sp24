@@ -97,4 +97,4 @@ def setup_data(CUT_TIME=1.00, BAG_SIZE=100, PAD=True):
 if __name__ == "__main__":
     data_old = setup_data(CUT_TIME=0.00, BAG_SIZE=1, PAD=False)
     data_new = setup_data(CUT_TIME=1.00, BAG_SIZE=100, PAD=True)
-    pickle.dump(data_new, open("data_new.pkl", "wb"))
+    # pickle.dump(data_new, open("data_new.pkl", "wb"))
