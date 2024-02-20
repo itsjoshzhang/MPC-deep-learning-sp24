@@ -15,9 +15,9 @@ class RobotData(Dataset):
             for i in range(len(bag)-size-1):    # -1 to ensure <size> messages + 1 for label
                 featr = bag[i: i + size]        # Extract sequence of length <size> messages
 
-                self.featrs.append(featr)
+                featrs.append(featr)
                 label = bag[i + size][:6]       # Next state (excluding time / acceleration)
-                self.labels.append(label)
+                labels.append(label)
 
         tens = lambda x: torch.tensor(x, dtype = torch.float32)
         self.featrs = tens(featrs)
@@ -56,9 +56,32 @@ class GRU_Model(nn.Module):
         # Init hidden state w/0           <BATCH_S>
         hidden = torch.zeros(self.layers, x.size(0), self.hidden)
         # Forward propagate GRU
-        output, _ = self.gru(x, hidden) # x/output: (BATCH_S, SEQ_LEN, IN/HID)
+        output, _ = self.gru(x, hidden)    # x/output: (BATCH_S, SEQ_LEN, IN/HID)
         # Decode last time step
-        return self.full_c(output[:, -1, :]) # output shape: (BATCH_S, OUTPUT)
+        return self.full_c(output[:,-1,:]) # output shape: (BATCH_S, OUTPUT)
+
+class LSTM_Model(nn.Module):
+
+    def __init__(self, inputs, hidden, output, layers, do_drop):
+        super(LSTM_Model, self).__init__()
+
+        self.hidden = hidden
+        self.layers = layers
+        dropout = 0.1 if do_drop else 0
+
+        self.lstm   = nn.LSTM(inputs, hidden, layers,
+            batch_first=True, dropout=dropout)
+        self.full_c = nn.Linear(hidden, output)
+
+    def forward(self, x):
+        # Init hidden state w/0           <BATCH_S>
+        hidden = torch.zeros(self.layers, x.size(0), self.hidden)
+        kinect = torch.zeros(self.layers, x.size(0), self.hidden)
+
+        # Forward propagate LSTM
+        output, _ = self.lstm(x, (hidden, kinect)) # x/output: (BATCH_S, SEQ_LEN, IN/HID)
+        # Decode last time step
+        return self.full_c(output[:,-1,:]) # output shape: (BATCH_S, OUTPUT)
 
 INPUTS = 8      # (pos.(2), orient.(1), vel.(3), acceleration (2))
 OUTPUT = 6      # (positions (2), orientation (1), velocities (3))
@@ -75,7 +98,8 @@ EPOCHS  = 128
 DATA = pickle.load(open("data_new.pkl", "rb"))
 dataset = RobotData(DATA, F_SIZE, DO_NORM)
 
-def train_model():
+def train_model(model_class):
+
     t_size = int(len(dataset) * 0.8)
     v_size = len(dataset) - t_size
 
@@ -83,7 +107,7 @@ def train_model():
     t_load = DataLoader(t_data, batch_size=BATCH_S, shuffle=True)
     v_load = DataLoader(v_data, batch_size=BATCH_S, shuffle=False)
 
-    model = GRU_Model(INPUTS, HIDDEN, OUTPUT, LAYERS, DO_DROP)
+    model  = model_class(INPUTS, HIDDEN, OUTPUT, LAYERS, DO_DROP)
     optimizer = optim.Adam(model.parameters(), lr=LEARN_R)
     scheduler = ReduceLROnPlateau(optimizer)
 
@@ -101,32 +125,36 @@ def train_model():
             loss.backward()
             optimizer.step()
         
-        scheduler.step()
         model.eval()
         v_loss = 0
         with torch.no_grad():
-
             for featrs, labels in v_load:
+
                 output = model(featrs)
                 loss = criterion(output, labels)
                 v_loss += loss.item()
         
         v_loss /= len(v_load)
+        scheduler.step(v_loss)
         print(f"Epoch {i + 1}: valid_loss = {v_loss:.4f}")
 
         if v_loss < min_loss:
             min_loss = v_loss
             patience = 0
-            path = f"models/GRU_{HIDDEN}_{LAYERS}_{F_SIZE}_{BATCH_S}_{v_loss}.pt"
+
+            name = str(model_class).split(".")[1]
+            path = f"models/{name}_{HIDDEN}_{LAYERS}_{F_SIZE}_{BATCH_S}_{v_loss:.4f}.pt"
             torch.save(model.state_dict(), path)
 
         else: patience += 1
-        if patience >= 10: print("Early stop.") #; break
+        if patience >= 10:
+            print("Early stop.")
 
 if __name__ == "__main__":
     for hidden in [64, 128]:
         for layers in [8, 16]:
-            for f_size in [8, 16]:
-                for batch_s in [128, 1024]:
+            for f_size in [5, 10]:
+                for batch_s in [128]:
                     HIDDEN, LAYERS, F_SIZE, BATCH_S = hidden, layers, f_size, batch_s
-                    train_model()
+                    train_model(GRU_Model)
+                    train_model(LSTM_Model)
