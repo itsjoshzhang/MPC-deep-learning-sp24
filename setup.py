@@ -27,8 +27,8 @@ Msg:
     "timing"    = {'step_start': ..., 'step_exec': ..., 'source': ..., 'publish': ...}
     "lap_num"   = ...
 """
-DATA = pickle.load(open("data_old.pkl", "rb"))
 
+DATA = pickle.load(open("data_old.pkl", "rb"))
 
 def print_keys():
     for data in DATA.items():
@@ -45,8 +45,7 @@ def print_keys():
                 print(f"{msg[0]} = {vals}")
             return
 
-
-def setup_data(CUT_TIME=1.00):
+def setup_data(cut_time = 1.00):
     """
     Returns nested list DATA:
         data[x] = bag
@@ -58,9 +57,9 @@ def setup_data(CUT_TIME=1.00):
     data_list = []
     for bag in DATA.values():
         bag_list = []
-                                                # sort by incr. msg[time]
-        bag_sort = sorted(bag.values(), key=lambda msg: msg["t"])
-        max_time = bag_sort[-1]["t"] - CUT_TIME # max cutoff time for bag
+                                                # Sort by incr. msg[time]
+        bag_sort = sorted(bag.values(), key = lambda msg: msg["t"])
+        max_time = bag_sort[-1]["t"] - cut_time # Max cutoff time for bag
 
         for msg in bag_sort:
             if msg["t"] <= max_time:
@@ -81,8 +80,9 @@ def setup_data(CUT_TIME=1.00):
     print(f"\n{len(data_list)} rosbags, {size(len)} messages, and {size(sum)} datapoints parsed.")
     return data_list
 
-
 if __name__ == "__main__":
-    data_old = setup_data(CUT_TIME=0.00)
-    data_new = setup_data(CUT_TIME=1.00007)
-    pickle.dump(data_new, open("data_new.pkl", "wb"))
+    print_keys()
+    setup_data(cut_time = 0.00)
+
+    data = setup_data(cut_time = 1.00007)
+    pickle.dump(data, open("data_new.pkl", "wb"))
