@@ -27,8 +27,8 @@ Msg:
     "timing"    = {'step_start': ..., 'step_exec': ..., 'source': ..., 'publish': ...}
     "lap_num"   = ...
 """
-
 DATA = pickle.load(open("data_old.pkl", "rb"))
+
 
 def print_keys():
     for data in DATA.items():
@@ -45,7 +45,8 @@ def print_keys():
                 print(f"{msg[0]} = {vals}")
             return
 
-def setup_data(CUT_TIME=1.00, BAG_SIZE=100, PAD=True):
+
+def setup_data(CUT_TIME=1.00):
     """
     Returns nested list DATA:
         data[x] = bag
@@ -53,8 +54,6 @@ def setup_data(CUT_TIME=1.00, BAG_SIZE=100, PAD=True):
         data[x][y][z] = point
     Removes msgs within 1 sec
         of end of test/rosbag
-    Limits max length of bags
-        to 100, pruning extra
     """
     data_list = []
     for bag in DATA.values():
@@ -71,30 +70,19 @@ def setup_data(CUT_TIME=1.00, BAG_SIZE=100, PAD=True):
                     msg["x"]["y"],          # 1.                'y'}
                     msg["e"]["psi"],        # 2. "e" (orient)= {'psi'}
                     msg["w"]["w_psi"],      # 3. "w" (ang.v) = {'w_psi'}
-                #   msg["aa"]["a_psi"],     # _. "aa"(ang.a) = {'a_psi'}
                     msg["v"]["v_long"],     # 4. "v" (veloc) = {'v_long',
                     msg["v"]["v_tran"],     # 5.                'v_tran'}
-                #   msg["a"]["a_long"],     # _. "a" (accel) = {'a_long',
-                #   msg["a"]["a_tran"],     # _.                'a_tran'}
                     msg["u"]["u_a"],        # 6."u" (actuat)= {'u_a',
                     msg["u"]["u_steer"]     # 7.               'u_steer'}
                 ])
-            if len(bag_list) == BAG_SIZE:   # Limit max length of bag
-                data_list.append(bag_list)  # @ BAG_SIZE, prune extra
-                bag_list = []
-
-        tol = 8 if PAD else 0               # allow bags near 100-tol
-        if len(bag_list) >= BAG_SIZE - tol: # pad to len 100 w/ zeros
-
-            for _ in range(BAG_SIZE - len(bag_list)):
-                bag_list.append([0 for _ in range(tol)])
-            data_list.append(bag_list)
+        data_list.append(bag_list)
 
     size = lambda func: sum([func([len(msg) for msg in bag]) for bag in data_list])
     print(f"\n{len(data_list)} rosbags, {size(len)} messages, and {size(sum)} datapoints parsed.")
     return data_list
 
+
 if __name__ == "__main__":
-    data_old = setup_data(CUT_TIME=0.00, BAG_SIZE=1, PAD=False)
-    data_new = setup_data(CUT_TIME=1.00, BAG_SIZE=100, PAD=True)
-    # pickle.dump(data_new, open("data_new.pkl", "wb"))
+    data_old = setup_data(CUT_TIME=0.00)
+    data_new = setup_data(CUT_TIME=1.00007)
+    pickle.dump(data_new, open("data_new.pkl", "wb"))
