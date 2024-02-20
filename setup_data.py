@@ -85,4 +85,4 @@ if __name__ == "__main__":
     setup_data(cut_time = 0.00)
 
     data = setup_data(cut_time = 1.00007)
-    pickle.dump(data, open("data_new.pkl", "wb"))
+    #pickle.dump(data, open("data_new.pkl", "wb"))

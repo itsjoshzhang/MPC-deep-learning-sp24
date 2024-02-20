@@ -86,14 +86,14 @@ class LSTM_Model(nn.Module):
 INPUTS = 8      # (pos.(2), orient.(1), vel.(3), acceleration (2))
 OUTPUT = 6      # (positions (2), orientation (1), velocities (3))
 HIDDEN = 64
-LAYERS = 8
-F_SIZE = 8
+LAYERS = 4
+F_SIZE = 5
 
 DO_DROP = False
 DO_NORM = False
 BATCH_S = 128
 LEARN_R = 0.001
-EPOCHS  = 128
+EPOCHS  = 64
 
 DATA = pickle.load(open("data_new.pkl", "rb"))
 dataset = RobotData(DATA, F_SIZE, DO_NORM)
@@ -114,6 +114,10 @@ def train_model(model_class):
     criterion = nn.MSELoss()
     min_loss = float('inf')
     patience = 0
+
+    name = str(model_class).split(".")[1]
+    path = f"models/{name}_{HIDDEN}_{LAYERS}_{F_SIZE}_{BATCH_S}.pt"
+    print(f"Training {path}")
 
     for i in range(EPOCHS):
         model.train()
@@ -141,9 +145,6 @@ def train_model(model_class):
         if v_loss < min_loss:
             min_loss = v_loss
             patience = 0
-
-            name = str(model_class).split(".")[1]
-            path = f"models/{name}_{HIDDEN}_{LAYERS}_{F_SIZE}_{BATCH_S}_{v_loss:.4f}.pt"
             torch.save(model.state_dict(), path)
 
         else: patience += 1
@@ -151,10 +152,10 @@ def train_model(model_class):
             print("Early stop.")
 
 if __name__ == "__main__":
-    for hidden in [64, 128]:
-        for layers in [8, 16]:
-            for f_size in [5, 10]:
-                for batch_s in [128]:
+    for hidden in [64]:
+        for layers in [8]:
+            for f_size in [10]:
+                for batch_s in [1024]:
                     HIDDEN, LAYERS, F_SIZE, BATCH_S = hidden, layers, f_size, batch_s
-                    train_model(GRU_Model)
                     train_model(LSTM_Model)
+                exit()
