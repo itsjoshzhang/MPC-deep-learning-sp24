@@ -1,4 +1,8 @@
+import os
+import torch
 import pickle
+import random
+import train_model as tm
 
 """
 NAME:   (SIZE)
@@ -28,7 +32,7 @@ Msg:
     "lap_num"   = ...
 """
 
-DATA = pickle.load(open("data_old.pkl", "rb"))
+DATA = pickle.load(open("misc/data_old.pkl", "rb"))
 
 def print_keys():
     for data in DATA.items():
@@ -80,9 +84,47 @@ def setup_data(cut_time = 1.00):
     print(f"\n{len(data_list)} rosbags, {size(len)} messages, and {size(sum)} datapoints parsed.")
     return data_list
 
-if __name__ == "__main__":
-    print_keys()
-    setup_data(cut_time = 0.00)
+def eval_files(folder, epochs = 1):
 
-    data = setup_data(cut_time = 1.00007)
-    #pickle.dump(data, open("data_new.pkl", "wb"))
+    for file in os.listdir(folder):
+        name = file.split("_")
+        model_type = eval(f"tm.{name[0]}_Model")
+        
+        inputs = tm.INPUTS
+        output = tm.OUTPUT
+        hidden = int(name[1])
+        layers = int(name[2])
+        f_size = int(name[3])
+
+        bools = folder.split("/")[1].split("_")
+        do_norm = bool(bools[0])
+        do_drop = bool(bools[1])
+
+        model = model_type(inputs, hidden, output, layers, do_drop).to(tm.device)
+        model.load_state_dict(torch.load(f"{folder}/{file}"))
+        
+        dataset = tm.RobotData(tm.DATA, f_size, do_norm)
+        diff, error = 0, 0
+
+        for _ in range(epochs):
+            i = random.randint(0, len(dataset) - 1)
+            featrs, labels = dataset[i]
+            
+            featrs = featrs.to(tm.device).unsqueeze(0) # Add dim. for batch_size
+            labels = labels.to(tm.device).unsqueeze(0)
+
+            model.eval()
+            with torch.no_grad():
+                output = model(featrs)
+            
+            diff  += torch.mean(torch.abs(output - labels)).item()
+            error += torch.mean(torch.abs((diff / labels) * 100)).item()
+        
+        print(f"\nEvaluating {file}:")
+        print(f"Average difference: {(diff / epochs):.4f}")
+        print(f"Avg. percent error: {(error / epochs):.4f}")
+
+if __name__ == "__main__":
+    setup_data(cut_time = 0.00)
+    setup_data(cut_time = 1.00007)
+    eval_files("models/False_False")
