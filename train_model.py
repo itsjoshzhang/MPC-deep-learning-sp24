@@ -48,7 +48,7 @@ class GRU_Model(nn.Module):
 
         self.hidden = hidden
         self.layers = layers
-        dropout = 0.1 if do_drop else 0
+        dropout = 0.128 if do_drop else 0
 
         self.gru    = nn.GRU(inputs, hidden, layers,
             batch_first=True, dropout=dropout)
@@ -69,7 +69,7 @@ class LSTM_Model(nn.Module):
 
         self.hidden = hidden
         self.layers = layers
-        dropout = 0.1 if do_drop else 0
+        dropout = 0.128 if do_drop else 0
 
         self.lstm   = nn.LSTM(inputs, hidden, layers,
             batch_first=True, dropout=dropout)
@@ -86,14 +86,14 @@ class LSTM_Model(nn.Module):
 INPUTS = 8      # (pos.(2), orient.(1), vel.(3), acceleration (2))
 OUTPUT = 6      # (positions (2), orientation (1), velocities (3))
 HIDDEN = 64
-LAYERS = 4
+LAYERS = 8
 F_SIZE = 8
 
 DO_NORM = True
 DO_DROP = False
-BATCH_S = 64
+BATCH_S = 128
 LEARN_R = 0.001
-EPOCHS  = 64
+EPOCHS  = 128
 
 DATA = pickle.load(open("data_new.pkl", "rb"))
 dataset = RobotData(DATA, F_SIZE, DO_NORM)
@@ -150,20 +150,20 @@ def train_model(model_type):
             min_loss = v_loss
             patience = 0
             torch.save(model.state_dict(), path)
-        else:
-            patience += 1
+        else: patience += 1
 
-        if patience >= 10:
+        if patience > 12.8:
             print("Early stop triggered.")
-        if v_loss >= 1.5:
+            return 0
+        if v_loss > 1.28:
             print("Bad loss. Restarting:")
             return 1
 
 if __name__ == "__main__":
     for hidden in [64, 32]:
-        for layers in [8, 4]:
+        for layers in [16, 8]:
             for f_size in [8, 4]:
-                for batch_s in [64, 128]:
+                for batch_s in [128, 1024]:
 
                     HIDDEN, LAYERS, F_SIZE, BATCH_S = hidden, layers, f_size, batch_s
                     while train_model(GRU_Model):  continue

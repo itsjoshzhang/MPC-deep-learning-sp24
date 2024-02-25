@@ -9,16 +9,16 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class RobotData(Dataset):
 
-    def __init__(self, data, size, norm):
+    def __init__(self, data, norm):
         featrs, labels = [], []
-        self.size = size
+        # self.size = size
 
         for bag in data:
-            for i in range(len(bag)-size-1):    # -1 to ensure <size> messages + 1 for label
-                featr = bag[i: i + size]        # Extract sequence of length <size> messages
+            for i in range(len(bag) - 1):
+                featr = bag[i]
 
                 featrs.append(featr)
-                label = bag[i + size][:6]       # Next state (excluding time / acceleration)
+                label = bag[i + 1][:6]
                 labels.append(label)
 
         tens = lambda x: torch.tensor(x, dtype=torch.float32).to(device)
@@ -41,62 +41,40 @@ class RobotData(Dataset):
     def __getitem__(self, i):
         return self.featrs[i], self.labels[i]
 
-class GRU_Model(nn.Module):
+class Basic_Model(nn.Module):
 
     def __init__(self, inputs, hidden, output, layers, do_drop):
-        super(GRU_Model, self).__init__()
+        super(Basic_Model, self).__init__()
 
-        self.hidden = hidden
-        self.layers = layers
-        dropout = 0.1 if do_drop else 0
-
-        self.gru    = nn.GRU(inputs, hidden, layers,
-            batch_first=True, dropout=dropout)
-        self.full_c = nn.Linear(hidden, output)
-
+        self.layers = nn.ModuleList()
+        self.layers.append(nn.Linear(inputs, hidden))
+        
+        for _ in range(layers):
+            self.layers.append(nn.Linear(hidden, hidden))
+            if do_drop:
+                self.layers.append(nn.Dropout(0.128))
+        
+        self.layers.append(nn.Linear(hidden, output))
+        
     def forward(self, x):
-        # Init hidden state w/0           <BATCH_S>
-        hidden = torch.zeros(self.layers, x.size(0), self.hidden).to(device)
-        # Forward propagate GRU
-        output, _ = self.gru(x, hidden)    # x/output: (BATCH_S, SEQ_LEN, IN/HID)
-        # Decode last time step
-        return self.full_c(output[:,-1,:]) # output shape: (BATCH_S, OUTPUT)
-
-class LSTM_Model(nn.Module):
-
-    def __init__(self, inputs, hidden, output, layers, do_drop):
-        super(LSTM_Model, self).__init__()
-
-        self.hidden = hidden
-        self.layers = layers
-        dropout = 0.1 if do_drop else 0
-
-        self.lstm   = nn.LSTM(inputs, hidden, layers,
-            batch_first=True, dropout=dropout)
-        self.full_c = nn.Linear(hidden, output)
-
-    def forward(self, x):
-        # Init hidden state w/0                   <BATCH_S>
-        init_0 = lambda: torch.zeros(self.layers, x.size(0), self.hidden).to(device)
-        # Forward propagate LSTM
-        output, _ = self.lstm(x, (init_0(), init_0())) # x/output: (BATCH_S, SEQ_LEN, IN/HID)
-        # Decode last time step
-        return self.full_c(output[:,-1,:]) # output shape: (BATCH_S, OUTPUT)
+        for layer in self.layers[:-1]:
+            x = torch.relu(layer(x))
+        return self.layers[-1](x) # No activ func with reg. output
 
 INPUTS = 8      # (pos.(2), orient.(1), vel.(3), acceleration (2))
 OUTPUT = 6      # (positions (2), orientation (1), velocities (3))
 HIDDEN = 64
-LAYERS = 4
-F_SIZE = 8
+LAYERS = 8
+# F_SIZE = 8
 
 DO_NORM = True
 DO_DROP = False
-BATCH_S = 64
+BATCH_S = 128
 LEARN_R = 0.001
-EPOCHS  = 64
+EPOCHS  = 128
 
 DATA = pickle.load(open("data_new.pkl", "rb"))
-dataset = RobotData(DATA, F_SIZE, DO_NORM)
+dataset = RobotData(DATA, DO_NORM)
 
 def train_model(model_type):
 
@@ -116,7 +94,7 @@ def train_model(model_type):
     patience = 0
 
     name = str(model_type).split(".")[1].split("_")[0]
-    path = f"models/{DO_NORM}_{DO_DROP}/{name}_{HIDDEN}_{LAYERS}_{F_SIZE}_{BATCH_S}.pt"
+    path = f"models/{DO_NORM}_{DO_DROP}/{name}_{HIDDEN}_{LAYERS}_{BATCH_S}.pt"
     print(f"Training {path}:")
 
     for i in range(EPOCHS):
@@ -150,21 +128,20 @@ def train_model(model_type):
             min_loss = v_loss
             patience = 0
             torch.save(model.state_dict(), path)
-        else:
-            patience += 1
+        else: patience += 1
 
-        if patience >= 10:
+        if patience > 12.8:
             print("Early stop triggered.")
-        if v_loss >= 1.5:
+            return 0
+        if v_loss > 1.28:
             print("Bad loss. Restarting:")
             return 1
 
 if __name__ == "__main__":
-    for hidden in [64, 32]:
-        for layers in [8, 4]:
-            for f_size in [8, 4]:
-                for batch_s in [64, 128]:
-
-                    HIDDEN, LAYERS, F_SIZE, BATCH_S = hidden, layers, f_size, batch_s
-                    while train_model(GRU_Model):  continue
-                    while train_model(LSTM_Model): continue
+    for do_norm in [True, False]:
+        for do_drop in [True, False]:
+            for hidden in [64, 32]:
+                for layers in [16, 8]:
+                    for batch_s in [128, 1024]:
+                        DO_NORM, DO_DROP, HIDDEN, LAYERS, BATCH_S = do_norm, do_drop, hidden, layers, batch_s
+                        while train_model(Basic_Model): continue
