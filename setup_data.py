@@ -2,7 +2,7 @@ import os
 import torch
 import pickle
 import random
-import train_model as tm
+import basic_model as tm
 
 """
 NAME:   (SIZE)
@@ -84,9 +84,10 @@ def setup_data(cut_time = 1.00):
     print(f"\n{len(data_list)} rosbags, {size(len)} messages, and {size(sum)} datapoints parsed.")
     return data_list
 
-def eval_files(folder, epochs = 1):
+def eval_files(folder, epochs = 1000):
+    dataset = tm.RobotData(tm.DATA)
 
-    for file in os.listdir(folder):
+    for file in sorted(os.listdir(folder)):
         name = file.split("_")
         model_type = eval(f"tm.{name[0]}_Model")
         
@@ -94,19 +95,18 @@ def eval_files(folder, epochs = 1):
         output = tm.OUTPUT
         hidden = int(name[1])
         layers = int(name[2])
-        f_size = int(name[3])
+        # f_size = int(name[3])
 
         bools = folder.split("/")[1].split("_")
-        do_norm = bool(bools[0])
-        do_drop = bool(bools[1])
+        do_norm = eval(bools[0])
+        do_drop = eval(bools[1])
 
         model = model_type(inputs, hidden, output, layers, do_drop).to(tm.device)
-        model.load_state_dict(torch.load(f"{folder}/{file}"))
+        model.load_state_dict(torch.load(f"{folder}/{file}", map_location="cpu"))
         
-        dataset = tm.RobotData(tm.DATA, f_size, do_norm)
-        diff, error = 0, 0
-
+        diff, rmse = 0, 0
         for _ in range(epochs):
+
             i = random.randint(0, len(dataset) - 1)
             featrs, labels = dataset[i]
             
@@ -117,14 +117,14 @@ def eval_files(folder, epochs = 1):
             with torch.no_grad():
                 output = model(featrs)
             
-            diff  += torch.mean(torch.abs(output - labels)).item()
-            error += torch.mean(torch.abs((diff / labels) * 100)).item()
+            diff += torch.mean(torch.abs(output - labels)).item()
+            rmse += torch.sqrt(torch.mean((output - labels) ** 2)).item()
         
-        print(f"\nEvaluating {file}:")
-        print(f"Average difference: {(diff / epochs):.4f}")
-        print(f"Avg. percent error: {(error / epochs):.4f}")
+        print(f"\n{folder}/{file}")
+        print(f"Avg. difference: {(diff / epochs):.4f}")
+        print(f"Avg. rmsq error: {(rmse / epochs):.4f}")
+    print("\n====================")
 
 if __name__ == "__main__":
-    setup_data(cut_time = 0.00)
-    setup_data(cut_time = 1.00007)
-    eval_files("models/False_False")
+    for folder in os.listdir("models"):
+        eval_files(f"models/{folder}")

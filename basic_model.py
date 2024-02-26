@@ -9,9 +9,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class RobotData(Dataset):
 
-    def __init__(self, data, norm):
+    def __init__(self, data):
         featrs, labels = [], []
-        # self.size = size
 
         for bag in data:
             for i in range(len(bag) - 1):
@@ -24,7 +23,7 @@ class RobotData(Dataset):
         tens = lambda x: torch.tensor(x, dtype=torch.float32).to(device)
         self.featrs = tens(featrs)
         self.labels = tens(labels)
-        if norm: self.norm()
+        self.norm()
 
     def norm(self):
         f_mean = torch.mean(self.featrs, dim=0)
@@ -52,7 +51,7 @@ class Basic_Model(nn.Module):
         for _ in range(layers):
             self.layers.append(nn.Linear(hidden, hidden))
             if do_drop:
-                self.layers.append(nn.Dropout(0.128))
+                self.layers.append(nn.Dropout(0.1))
         
         self.layers.append(nn.Linear(hidden, output))
         
@@ -65,16 +64,14 @@ INPUTS = 8      # (pos.(2), orient.(1), vel.(3), acceleration (2))
 OUTPUT = 6      # (positions (2), orientation (1), velocities (3))
 HIDDEN = 64
 LAYERS = 8
-# F_SIZE = 8
 
-DO_NORM = True
 DO_DROP = False
 BATCH_S = 128
-LEARN_R = 0.001
-EPOCHS  = 128
+LEARN_R = 0.001 # CONSTANT
+EPOCHS  = 100   # CONSTANT
 
 DATA = pickle.load(open("data_new.pkl", "rb"))
-dataset = RobotData(DATA, DO_NORM)
+dataset = RobotData(DATA)
 
 def train_model(model_type):
 
@@ -94,7 +91,7 @@ def train_model(model_type):
     patience = 0
 
     name = str(model_type).split(".")[1].split("_")[0]
-    path = f"models/{DO_NORM}_{DO_DROP}/{name}_{HIDDEN}_{LAYERS}_{BATCH_S}.pt"
+    path = f"models/{True}_{DO_DROP}/{name}_{HIDDEN}_{LAYERS}_{BATCH_S}.pt"
     print(f"Training {path}:")
 
     for i in range(EPOCHS):
@@ -130,21 +127,17 @@ def train_model(model_type):
             torch.save(model.state_dict(), path)
         else: patience += 1
 
-        if patience > 12.8:
+        if patience > 10:
             print("Early stop triggered.")
             # return 0
-        if v_loss > 1.28:
+        if v_loss > 1:
             print("Bad loss. Restarting:")
             return 1
 
 if __name__ == "__main__":
-    for do_norm in [True, False]:
-        for do_drop in [True, False]:
+    for hidden in [64, 128, 256]:
+        for layers in [16, 8, 4]:
+            for batch_s in [64, 128, 256]:
 
-            for hidden in [64, 32]:
-                for layers in [16, 8]:
-                    for batch_s in [128, 1024]:
-
-                        DO_NORM, DO_DROP, HIDDEN, LAYERS, BATCH_S = (
-                            do_norm, do_drop, hidden, layers, batch_s)
-                        while train_model(Basic_Model): continue
+                HIDDEN, LAYERS, BATCH_S = hidden, layers, batch_s
+                while train_model(Basic_Model): continue

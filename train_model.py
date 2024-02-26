@@ -89,11 +89,11 @@ HIDDEN = 64
 LAYERS = 8
 F_SIZE = 8
 
-DO_NORM = True
+DO_NORM = True  # CONSTANT
 DO_DROP = False
 BATCH_S = 128
-LEARN_R = 0.001
-EPOCHS  = 128
+LEARN_R = 0.001 # CONSTANT
+EPOCHS  = 100   # CONSTANT
 
 DATA = pickle.load(open("data_new.pkl", "rb"))
 dataset = RobotData(DATA, F_SIZE, DO_NORM)
