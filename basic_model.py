@@ -132,7 +132,7 @@ def train_model(model_type):
 
         if patience > 12.8:
             print("Early stop triggered.")
-            return 0
+            # return 0
         if v_loss > 1.28:
             print("Bad loss. Restarting:")
             return 1
@@ -140,8 +140,11 @@ def train_model(model_type):
 if __name__ == "__main__":
     for do_norm in [True, False]:
         for do_drop in [True, False]:
+
             for hidden in [64, 32]:
                 for layers in [16, 8]:
                     for batch_s in [128, 1024]:
-                        DO_NORM, DO_DROP, HIDDEN, LAYERS, BATCH_S = do_norm, do_drop, hidden, layers, batch_s
+
+                        DO_NORM, DO_DROP, HIDDEN, LAYERS, BATCH_S = (
+                            do_norm, do_drop, hidden, layers, batch_s)
                         while train_model(Basic_Model): continue
