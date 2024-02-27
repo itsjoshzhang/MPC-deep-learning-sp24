@@ -63,11 +63,11 @@ class Basic_Model(nn.Module):
 INPUTS = 8      # (pos.(2), orient.(1), vel.(3), acceleration (2))
 OUTPUT = 6      # (positions (2), orientation (1), velocities (3))
 HIDDEN = 64
-LAYERS = 8
+LAYERS = 4
 
-DO_DROP = False
+DO_DROP = False # CONSTANT
 BATCH_S = 128
-LEARN_R = 0.001 # CONSTANT
+LEARN_R = 0.001
 EPOCHS  = 100   # CONSTANT
 
 DATA = pickle.load(open("data_new.pkl", "rb"))
@@ -135,32 +135,9 @@ def train_model(model_type):
             return 1
 
 if __name__ == "__main__":
-    for hidden in [64, 128, 256]:
-        for layers in [16, 8, 4]:
-            for batch_s in [64, 128, 256]:
+    for learn_r in [1e-2, 1e-3, 1e-4]:
+        for hidden in [64, 32, 16]:
+            for layers in [6, 4, 2]:
 
-                HIDDEN, LAYERS, BATCH_S = hidden, layers, batch_s
+                HIDDEN, LAYERS, BATCH_S, LEARN_R = hidden, layers, hidden, learn_r
                 while train_model(Basic_Model): continue
-
-"""
-models/True_False/Basic_128_4_128.pt
-Avg. difference: 0.0346
-Avg. rmsq error: 0.0465
-
-models/True_False/Basic_128_4_64.pt
-Avg. difference: 0.0394
-Avg. rmsq error: 0.0520
-
-models/True_False/Basic_256_4_256.pt
-Avg. difference: 0.0333
-Avg. rmsq error: 0.0441
-
-models/True_False/Basic_256_8_64.pt
-Avg. difference: 0.0364
-Avg. rmsq error: 0.0480
-
-models/True_False/Basic_64_4_256.pt
-Avg. difference: 0.0373
-Avg. rmsq error: 0.0489
-
-"""

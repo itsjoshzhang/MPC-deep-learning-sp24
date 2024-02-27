@@ -86,13 +86,13 @@ class LSTM_Model(nn.Module):
 INPUTS = 8      # (pos.(2), orient.(1), vel.(3), acceleration (2))
 OUTPUT = 6      # (positions (2), orientation (1), velocities (3))
 HIDDEN = 64
-LAYERS = 8
-F_SIZE = 8
+LAYERS = 4
+F_SIZE = 4
 
 DO_NORM = True  # CONSTANT
-DO_DROP = False
+DO_DROP = False # CONSTANT
 BATCH_S = 128
-LEARN_R = 0.001 # CONSTANT
+LEARN_R = 0.001
 EPOCHS  = 100   # CONSTANT
 
 DATA = pickle.load(open("data_new.pkl", "rb"))

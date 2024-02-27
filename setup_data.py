@@ -84,7 +84,7 @@ def setup_data(cut_time = 1.00):
     print(f"\n{len(data_list)} rosbags, {size(len)} messages, and {size(sum)} datapoints parsed.")
     return data_list
 
-def eval_files(folder, epochs = 10000):
+def eval_files(folder, epochs, sample):
     dataset = tm.RobotData(tm.DATA)
     h = ""
 
@@ -110,9 +110,10 @@ def eval_files(folder, epochs = 10000):
         model.load_state_dict(torch.load(f"{folder}/{file}", map_location="cpu"))
         
         diff, rmse = 0, 0
-        for _ in range(epochs):
+        for i in range(epochs):
 
-            i = random.randint(0, len(dataset) - 1)
+            if sample:
+                i = random.randint(0, len(dataset) - 1)
             featrs, labels = dataset[i]
             
             featrs = featrs.to(tm.device).unsqueeze(0) # Add dim. for batch_size
@@ -131,4 +132,18 @@ def eval_files(folder, epochs = 10000):
 
 if __name__ == "__main__":
     for folder in os.listdir("models"):
-        eval_files(f"models/{folder}")
+        eval_files(f"models/{folder}", epochs=59900, sample=False)
+
+"""
+models/True_False/Basic_128_4_128.pt
+Avg. difference: 0.0370
+Avg. rmsq error: 0.0502
+
+models/True_False/Basic_256_4_256.pt
+Avg. difference: 0.0364
+Avg. rmsq error: 0.0491
+
+models/True_False/Basic_64_4_64.pt
+Avg. difference: 0.0299
+Avg. rmsq error: 0.0422
+"""
