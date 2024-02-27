@@ -132,18 +132,4 @@ def eval_files(folder, epochs, sample):
 
 if __name__ == "__main__":
     for folder in os.listdir("models"):
-        eval_files(f"models/{folder}", epochs=59900, sample=False)
-
-"""
-models/True_False/Basic_128_4_128.pt
-Avg. difference: 0.0370
-Avg. rmsq error: 0.0502
-
-models/True_False/Basic_256_4_256.pt
-Avg. difference: 0.0364
-Avg. rmsq error: 0.0491
-
-models/True_False/Basic_64_4_64.pt
-Avg. difference: 0.0299
-Avg. rmsq error: 0.0422
-"""
+        eval_files(f"models/{folder}", epochs=10000, sample=True)
