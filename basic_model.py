@@ -73,7 +73,7 @@ EPOCHS  = 100
 DATA = pickle.load(open("data_new.pkl", "rb"))
 dataset = RobotData(DATA)
 
-def train_model(model_type):
+def train_model(model_type, optimzr, loss_fn):
 
     t_size = int(len(dataset) * 0.8)
     v_size = len(dataset) - t_size
@@ -83,15 +83,19 @@ def train_model(model_type):
     v_load = DataLoader(v_data, batch_size=BATCH_S, shuffle=False)
 
     model  = model_type(INPUTS, HIDDEN, OUTPUT, LAYERS, DO_DROP).to(device)
-    optimizer = optim.Adam(model.parameters(), lr=LEARN_R)
+    optimizer = optimzr(model.parameters(), lr=LEARN_R)
     scheduler = ReduceLROnPlateau(optimizer)
 
-    criterion = nn.MSELoss()
+    criterion = loss_fn()
     min_loss = float('inf')
     patience = 0
 
     name = str(model_type).split(".")[1].split("_")[0]
-    path = f"models/{name}_{HIDDEN}_{LAYERS}_{BATCH_S}_{LEARN_R}.pt"
+
+    opti = str(optimzr).split(".")[-1][:-2]
+    lsfn = str(loss_fn).split(".")[-1][:-2]
+
+    path = f"models/{name}_{HIDDEN}_{LAYERS}_{BATCH_S}_{opti}_{lsfn}.pt"
     print(f"Training {path}:")
 
     for i in range(EPOCHS):
@@ -135,16 +139,8 @@ def train_model(model_type):
             return 1
 
 if __name__ == "__main__":
-    for hidden in [16, 64]:
-        for layers in [1, 2, 3]:
-            for batch_s in [16, 64]:
+    for optimzr in [optim.Adam, optim.SGD, optim.RMSprop]:
+        for loss_fn in [nn.MSELoss, nn.L1Loss, nn.SmoothL1Loss]:
 
-                HIDDEN, LAYERS, BATCH_S = hidden, layers, batch_s
-                while train_model(Basic_Model): continue
-
-    for hidden in [32]:
-        for layers in [3, 4, 5]:
-                for batch_s in [16, 64]:
-
-                    HIDDEN, LAYERS, BATCH_S, LEARN_R = hidden, layers, hidden, 0.0001
-                    while train_model(Basic_Model): continue
+            HIDDEN, LAYERS, BATCH_S = 16, 2, 16
+            while train_model(Basic_Model): continue
