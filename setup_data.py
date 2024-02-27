@@ -84,11 +84,11 @@ def setup_data(cut_time = 1.00):
     print(f"\n{len(data_list)} rosbags, {size(len)} messages, and {size(sum)} datapoints parsed.")
     return data_list
 
-def eval_files(folder, epochs, sample):
+def eval_files(epochs, sample):
     dataset = tm.RobotData(tm.DATA)
-    h = ""
+    h = 0
 
-    for file in sorted(os.listdir(folder)):
+    for file in sorted(os.listdir("models")):
         name = file.split("_")
         model_type = eval(f"tm.{name[0]}_Model")
         
@@ -96,19 +96,15 @@ def eval_files(folder, epochs, sample):
         output = tm.OUTPUT
         hidden = int(name[1])
         layers = int(name[2])
-        # f_size = int(name[3])
-
-        if h != hidden:
-            h = hidden
-            print("\n====================")
-
-        bools = folder.split("/")[1].split("_")
-        do_norm = eval(bools[0])
-        do_drop = eval(bools[1])
+        do_drop= False # int(name[4])
 
         model = model_type(inputs, hidden, output, layers, do_drop).to(tm.device)
-        model.load_state_dict(torch.load(f"{folder}/{file}", map_location="cpu"))
+        model.load_state_dict(torch.load(f"models/{file}", map_location="cpu"))
         
+        if h != hidden:
+            print("\n====================")
+            h = hidden
+            
         diff, rmse = 0, 0
         for i in range(epochs):
 
@@ -126,10 +122,9 @@ def eval_files(folder, epochs, sample):
             diff += torch.mean(torch.abs(output - labels)).item()
             rmse += torch.sqrt(torch.mean((output - labels) ** 2)).item()
         
-        print(f"\n{folder}/{file}")
+        print(f"\n{file}")
         print(f"Avg. difference: {(diff / epochs):.4f}")
         print(f"Avg. rmsq error: {(rmse / epochs):.4f}")
 
 if __name__ == "__main__":
-    for folder in os.listdir("models"):
-        eval_files(f"models/{folder}", epochs=10000, sample=True)
+    eval_files(epochs = 1000, sample = True)

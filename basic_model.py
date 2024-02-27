@@ -62,13 +62,13 @@ class Basic_Model(nn.Module):
 
 INPUTS = 8      # (pos.(2), orient.(1), vel.(3), acceleration (2))
 OUTPUT = 6      # (positions (2), orientation (1), velocities (3))
-HIDDEN = 64
+HIDDEN = 16
 LAYERS = 4
 
-DO_DROP = False # CONSTANT
 BATCH_S = 128
 LEARN_R = 0.001
-EPOCHS  = 100   # CONSTANT
+DO_DROP = False
+EPOCHS  = 100
 
 DATA = pickle.load(open("data_new.pkl", "rb"))
 dataset = RobotData(DATA)
@@ -91,7 +91,7 @@ def train_model(model_type):
     patience = 0
 
     name = str(model_type).split(".")[1].split("_")[0]
-    path = f"models/{True}_{DO_DROP}/{name}_{HIDDEN}_{LAYERS}_{BATCH_S}.pt"
+    path = f"models/{name}_{HIDDEN}_{LAYERS}_{BATCH_S}_{LEARN_R}.pt"
     print(f"Training {path}:")
 
     for i in range(EPOCHS):

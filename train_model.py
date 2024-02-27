@@ -9,7 +9,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class RobotData(Dataset):
 
-    def __init__(self, data, size, norm):
+    def __init__(self, data, size):
         featrs, labels = [], []
         self.size = size
 
@@ -24,7 +24,7 @@ class RobotData(Dataset):
         tens = lambda x: torch.tensor(x, dtype=torch.float32).to(device)
         self.featrs = tens(featrs)
         self.labels = tens(labels)
-        if norm: self.norm()
+        self.norm()
 
     def norm(self):
         f_mean = torch.mean(self.featrs, dim=0)
@@ -85,18 +85,16 @@ class LSTM_Model(nn.Module):
 
 INPUTS = 8      # (pos.(2), orient.(1), vel.(3), acceleration (2))
 OUTPUT = 6      # (positions (2), orientation (1), velocities (3))
-HIDDEN = 64
+HIDDEN = 16
 LAYERS = 4
-F_SIZE = 4
 
-DO_NORM = True  # CONSTANT
-DO_DROP = False # CONSTANT
+FT_SIZE = 4
 BATCH_S = 128
 LEARN_R = 0.001
-EPOCHS  = 100   # CONSTANT
+DO_DROP = False
 
 DATA = pickle.load(open("data_new.pkl", "rb"))
-dataset = RobotData(DATA, F_SIZE, DO_NORM)
+dataset = RobotData(DATA, FT_SIZE)
 
 def train_model(model_type):
 
@@ -116,10 +114,10 @@ def train_model(model_type):
     patience = 0
 
     name = str(model_type).split(".")[1].split("_")[0]
-    path = f"models/{DO_NORM}_{DO_DROP}/{name}_{HIDDEN}_{LAYERS}_{F_SIZE}_{BATCH_S}.pt"
+    path = f"models/{name}_{HIDDEN}_{LAYERS}_{FT_SIZE}_{BATCH_S}.pt"
     print(f"Training {path}:")
 
-    for i in range(EPOCHS):
+    for i in range(100):
         model.train()
         for featrs, labels in t_load:
             featrs = featrs.to(device)
@@ -160,11 +158,5 @@ def train_model(model_type):
             return 1
 
 if __name__ == "__main__":
-    for hidden in [64, 32]:
-        for layers in [16, 8]:
-            for f_size in [8, 4]:
-                for batch_s in [128, 1024]:
-
-                    HIDDEN, LAYERS, F_SIZE, BATCH_S = hidden, layers, f_size, batch_s
-                    while train_model(GRU_Model):  continue
-                    while train_model(LSTM_Model): continue
+    while train_model(GRU_Model):  continue
+    while train_model(LSTM_Model): continue
