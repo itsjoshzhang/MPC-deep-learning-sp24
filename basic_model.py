@@ -141,3 +141,26 @@ if __name__ == "__main__":
 
                 HIDDEN, LAYERS, BATCH_S = hidden, layers, batch_s
                 while train_model(Basic_Model): continue
+
+"""
+models/True_False/Basic_128_4_128.pt
+Avg. difference: 0.0346
+Avg. rmsq error: 0.0465
+
+models/True_False/Basic_128_4_64.pt
+Avg. difference: 0.0394
+Avg. rmsq error: 0.0520
+
+models/True_False/Basic_256_4_256.pt
+Avg. difference: 0.0333
+Avg. rmsq error: 0.0441
+
+models/True_False/Basic_256_8_64.pt
+Avg. difference: 0.0364
+Avg. rmsq error: 0.0480
+
+models/True_False/Basic_64_4_256.pt
+Avg. difference: 0.0373
+Avg. rmsq error: 0.0489
+
+"""

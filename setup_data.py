@@ -84,8 +84,9 @@ def setup_data(cut_time = 1.00):
     print(f"\n{len(data_list)} rosbags, {size(len)} messages, and {size(sum)} datapoints parsed.")
     return data_list
 
-def eval_files(folder, epochs = 1000):
+def eval_files(folder, epochs = 10000):
     dataset = tm.RobotData(tm.DATA)
+    h = ""
 
     for file in sorted(os.listdir(folder)):
         name = file.split("_")
@@ -96,6 +97,10 @@ def eval_files(folder, epochs = 1000):
         hidden = int(name[1])
         layers = int(name[2])
         # f_size = int(name[3])
+
+        if h != hidden:
+            h = hidden
+            print("\n====================")
 
         bools = folder.split("/")[1].split("_")
         do_norm = eval(bools[0])
@@ -123,7 +128,6 @@ def eval_files(folder, epochs = 1000):
         print(f"\n{folder}/{file}")
         print(f"Avg. difference: {(diff / epochs):.4f}")
         print(f"Avg. rmsq error: {(rmse / epochs):.4f}")
-    print("\n====================")
 
 if __name__ == "__main__":
     for folder in os.listdir("models"):
