@@ -21,9 +21,8 @@ class RobotData(Dataset):
                 label = bag[i + size][:6]       # Next state (excluding time / acceleration)
                 labels.append(label)
 
-        tens = lambda x: torch.tensor(x, dtype=torch.float32).to(device)
-        self.featrs = tens(featrs)
-        self.labels = tens(labels)
+        self.featrs = torch.tensor(featrs, dtype=torch.float32).to(device)
+        self.labels = torch.tensor(labels, dtype=torch.float32).to(device)
         self.norm()
 
     def norm(self):
@@ -43,45 +42,52 @@ class RobotData(Dataset):
 
 class GRU_Model(nn.Module):
 
-    def __init__(self, inputs, hidden, output, layers, do_drop):
+    def __init__(self, inputs, hidden, output, layers, state_f):
         super(GRU_Model, self).__init__()
 
         self.hidden = hidden
         self.layers = layers
-        dropout = 0.128 if do_drop else 0
+        self.state_f = state_f
+        self.h_state = None
 
-        self.gru    = nn.GRU(inputs, hidden, layers,
-            batch_first=True, dropout=dropout)
+        self.gru = nn.GRU(inputs, hidden, layers, batch_first=True)
         self.full_c = nn.Linear(hidden, output)
 
+    def init_hidden(self, batch_s):
+        self.h_state = torch.zeros(self.layers, batch_s, self.hidden).to(device)
+
     def forward(self, x):
-        # Init hidden state w/0           <BATCH_S>
-        hidden = torch.zeros(self.layers, x.size(0), self.hidden).to(device)
-        # Forward propagate GRU
-        output, _ = self.gru(x, hidden)    # x/output: (BATCH_S, SEQ_LEN, IN/HID)
-        # Decode last time step
-        return self.full_c(output[:,-1,:]) # output shape: (BATCH_S, OUTPUT)
+        if not self.state_f or self.h_state is None:
+            self.init_hidden(x.size(0))
+
+        # Detach to avoid backprop thru time
+        output, self.h_state = self.gru(x, self.h_state.detach())
+        return self.full_c(output[:, -1, :]) # shape (BATCH_S, OUTPUT)
 
 class LSTM_Model(nn.Module):
 
-    def __init__(self, inputs, hidden, output, layers, do_drop):
+    def __init__(self, inputs, hidden, output, layers, state_f):
         super(LSTM_Model, self).__init__()
 
         self.hidden = hidden
         self.layers = layers
-        dropout = 0.128 if do_drop else 0
+        self.state_f = state_f
+        self.h_state = None
 
-        self.lstm   = nn.LSTM(inputs, hidden, layers,
-            batch_first=True, dropout=dropout)
+        self.lstm = nn.LSTM(inputs, hidden, layers, batch_first=True)
         self.full_c = nn.Linear(hidden, output)
 
+    def init_hidden(self, batch_s):
+        self.h_state = (torch.zeros(self.layers, batch_s, self.hidden).to(device),
+                        torch.zeros(self.layers, batch_s, self.hidden).to(device))
+
     def forward(self, x):
-        # Init hidden state w/0                   <BATCH_S>
-        init_0 = lambda: torch.zeros(self.layers, x.size(0), self.hidden).to(device)
-        # Forward propagate LSTM
-        output, _ = self.lstm(x, (init_0(), init_0())) # x/output: (BATCH_S, SEQ_LEN, IN/HID)
-        # Decode last time step
-        return self.full_c(output[:,-1,:]) # output shape: (BATCH_S, OUTPUT)
+        if not self.state_f or self.h_state is None:
+            self.init_hidden(x.size(0))
+
+        unhook = (self.h_state[0].detach(), self.h_state[1].detach())
+        output, self.h_state = self.lstm(x, unhook)
+        return self.full_c(output[:, -1, :]) # shape (BATCH_S, OUTPUT)
 
 INPUTS = 8      # (pos.(2), orient.(1), vel.(3), acceleration (2))
 OUTPUT = 6      # (positions (2), orientation (1), velocities (3))
@@ -89,9 +95,9 @@ HIDDEN = 16
 LAYERS = 4
 
 FT_SIZE = 4
-BATCH_S = 128
+BATCH_S = 16
 LEARN_R = 0.001
-DO_DROP = False
+STATE_F = False
 
 DATA = pickle.load(open("data_new.pkl", "rb"))
 dataset = RobotData(DATA, FT_SIZE)
@@ -105,16 +111,16 @@ def train_model(model_type):
     t_load = DataLoader(t_data, batch_size=BATCH_S, shuffle=True)
     v_load = DataLoader(v_data, batch_size=BATCH_S, shuffle=False)
 
-    model  = model_type(INPUTS, HIDDEN, OUTPUT, LAYERS, DO_DROP).to(device)
+    model  = model_type(INPUTS, HIDDEN, OUTPUT, LAYERS, STATE_F).to(device)
     optimizer = optim.Adam(model.parameters(), lr=LEARN_R)
     scheduler = ReduceLROnPlateau(optimizer)
 
-    criterion = nn.MSELoss()
+    criterion = nn.L1Loss()
     min_loss = float('inf')
     patience = 0
 
     name = str(model_type).split(".")[1].split("_")[0]
-    path = f"models/{name}_{HIDDEN}_{LAYERS}_{FT_SIZE}_{BATCH_S}.pt"
+    path = f"models/{name}_{HIDDEN}_{LAYERS}_{FT_SIZE}_{BATCH_S}_{STATE_F}.pt"
     print(f"Training {path}:")
 
     for i in range(100):
@@ -152,11 +158,16 @@ def train_model(model_type):
 
         if patience > 10:
             print("Early stop triggered.")
-            # return 0
-        if v_loss > 1:
+        if v_loss > 0.2:
             print("Bad loss. Restarting:")
             return 1
 
 if __name__ == "__main__":
-    while train_model(GRU_Model):  continue
-    while train_model(LSTM_Model): continue
+    for hidden in [16, 64]:
+        for layers in [4, 8]:
+            for batch_s in [16, 64]:
+                for state_f in [True, False]:
+
+                    HIDDEN, LAYERS, BATCH_S, STATE_F = hidden, layers, batch_s, state_f
+                    while train_model(GRU_Model):  continue
+                    while train_model(LSTM_Model): continue

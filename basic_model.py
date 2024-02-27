@@ -20,9 +20,8 @@ class RobotData(Dataset):
                 label = bag[i + 1][:6]
                 labels.append(label)
 
-        tens = lambda x: torch.tensor(x, dtype=torch.float32).to(device)
-        self.featrs = tens(featrs)
-        self.labels = tens(labels)
+        self.featrs = torch.tensor(featrs, dtype=torch.float32).to(device)
+        self.labels = torch.tensor(labels, dtype=torch.float32).to(device)
         self.norm()
 
     def norm(self):
@@ -65,7 +64,7 @@ OUTPUT = 6      # (positions (2), orientation (1), velocities (3))
 HIDDEN = 16
 LAYERS = 4
 
-BATCH_S = 128
+BATCH_S = 16
 LEARN_R = 0.001
 DO_DROP = False
 EPOCHS  = 100
@@ -73,7 +72,7 @@ EPOCHS  = 100
 DATA = pickle.load(open("data_new.pkl", "rb"))
 dataset = RobotData(DATA)
 
-def train_model(model_type, optimzr, loss_fn):
+def train_model(model_type):
 
     t_size = int(len(dataset) * 0.8)
     v_size = len(dataset) - t_size
@@ -83,19 +82,15 @@ def train_model(model_type, optimzr, loss_fn):
     v_load = DataLoader(v_data, batch_size=BATCH_S, shuffle=False)
 
     model  = model_type(INPUTS, HIDDEN, OUTPUT, LAYERS, DO_DROP).to(device)
-    optimizer = optimzr(model.parameters(), lr=LEARN_R)
+    optimizer = optim.Adam(model.parameters(), lr=LEARN_R)
     scheduler = ReduceLROnPlateau(optimizer)
 
-    criterion = loss_fn()
+    criterion = nn.L1Loss()
     min_loss = float('inf')
     patience = 0
 
     name = str(model_type).split(".")[1].split("_")[0]
-
-    opti = str(optimzr).split(".")[-1][:-2]
-    lsfn = str(loss_fn).split(".")[-1][:-2]
-
-    path = f"models/{name}_{HIDDEN}_{LAYERS}_{BATCH_S}_{opti}_{lsfn}.pt"
+    path = f"models/{name}_{HIDDEN}_{LAYERS}_{BATCH_S}.pt"
     print(f"Training {path}:")
 
     for i in range(EPOCHS):
@@ -133,14 +128,13 @@ def train_model(model_type, optimzr, loss_fn):
 
         if patience > 10:
             print("Early stop triggered.")
-            # return 0
-        if v_loss > 1:
+        if v_loss > 0.1:
             print("Bad loss. Restarting:")
             return 1
 
 if __name__ == "__main__":
-    for optimzr in [optim.Adam, optim.SGD, optim.RMSprop]:
-        for loss_fn in [nn.MSELoss, nn.L1Loss, nn.SmoothL1Loss]:
-
-            HIDDEN, LAYERS, BATCH_S = 16, 2, 16
-            while train_model(Basic_Model): continue
+    for hidden in [16, 64]:
+        for layers in [1, 2, 3, 4]:
+            for batch_s in [16, 32, 64]:
+                HIDDEN, LAYERS, BATCH_S = hidden, layers, batch_s
+                while train_model(Basic_Model): continue

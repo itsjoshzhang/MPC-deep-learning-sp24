@@ -127,4 +127,4 @@ def eval_files(sample):
         print(f"Avg. rmsq error: {(rmse / epochs):.4f}")
 
 if __name__ == "__main__":
-    eval_files(sample = False)
+    eval_files(sample = True)
