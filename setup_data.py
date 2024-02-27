@@ -84,7 +84,7 @@ def setup_data(cut_time = 1.00):
     print(f"\n{len(data_list)} rosbags, {size(len)} messages, and {size(sum)} datapoints parsed.")
     return data_list
 
-def eval_files(epochs, sample):
+def eval_files(sample):
     dataset = tm.RobotData(tm.DATA)
     h = 0
 
@@ -96,16 +96,16 @@ def eval_files(epochs, sample):
         output = tm.OUTPUT
         hidden = int(name[1])
         layers = int(name[2])
-        do_drop= False # int(name[4])
 
-        model = model_type(inputs, hidden, output, layers, do_drop).to(tm.device)
+        model = model_type(inputs, hidden, output, layers, False).to(tm.device)
         model.load_state_dict(torch.load(f"models/{file}", map_location="cpu"))
         
         if h != hidden:
             print("\n====================")
             h = hidden
-            
+
         diff, rmse = 0, 0
+        epochs = 10000 if sample else 59900
         for i in range(epochs):
 
             if sample:
@@ -127,4 +127,4 @@ def eval_files(epochs, sample):
         print(f"Avg. rmsq error: {(rmse / epochs):.4f}")
 
 if __name__ == "__main__":
-    eval_files(epochs = 1000, sample = True)
+    eval_files(sample = False)

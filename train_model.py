@@ -150,10 +150,10 @@ def train_model(model_type):
             torch.save(model.state_dict(), path)
         else: patience += 1
 
-        if patience > 12.8:
+        if patience > 10:
             print("Early stop triggered.")
-            return 0
-        if v_loss > 1.28:
+            # return 0
+        if v_loss > 1:
             print("Bad loss. Restarting:")
             return 1
 

@@ -135,9 +135,16 @@ def train_model(model_type):
             return 1
 
 if __name__ == "__main__":
-    for learn_r in [1e-2, 1e-3, 1e-4]:
-        for hidden in [64, 32, 16]:
-            for layers in [6, 4, 2]:
+    for hidden in [16, 64]:
+        for layers in [1, 2, 3]:
+            for batch_s in [16, 64]:
 
-                HIDDEN, LAYERS, BATCH_S, LEARN_R = hidden, layers, hidden, learn_r
+                HIDDEN, LAYERS, BATCH_S = hidden, layers, batch_s
                 while train_model(Basic_Model): continue
+
+    for hidden in [32]:
+        for layers in [3, 4, 5]:
+                for batch_s in [16, 64]:
+
+                    HIDDEN, LAYERS, BATCH_S, LEARN_R = hidden, layers, hidden, 0.0001
+                    while train_model(Basic_Model): continue
