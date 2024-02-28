@@ -38,8 +38,8 @@ DATA = pickle.load(open("__misc__/data_old.pkl", "rb"))
 
 def print_keys():
     """
-    Print keys of rosbag message
-    Useful to debug data_old.pkl
+    Print keys of rosbag msg.
+    Use to debug data_old.pkl
     """
     for data in DATA.items():
         print(f"\nData ({len(DATA)} items): Keys = {data[0]}, Vals = <dict> Bag.")
@@ -92,10 +92,11 @@ def setup_data(cut_time = 1.00):
 
 def eval_files(folder, sample):
     """
-    Eval all models in 
-
-
-    
+    Eval all models in folder
+    w/ mean abs. error & rmse
+    if sample = True:
+        Use 10k random points
+    else: All 60k data points
     """
     dataset = tm.RobotData(tm.DATA)
     curr_h  = 0
@@ -117,14 +118,15 @@ def eval_files(folder, sample):
             curr_h = hidden
 
         diff, rmse = 0, 0
-        epochs = 10000 if sample else 59900
-        for i in range(epochs):
+        if sample: epochs = 10000
+        else: epochs = len(dataset)
 
+        for i in range(epochs):
             if sample:
                 i = random.randint(0, len(dataset) - 1)
             featrs, labels = dataset[i]
             
-            featrs = featrs.to(tm.device).unsqueeze(0) # Add dim. for batch_size
+            featrs = featrs.to(tm.device).unsqueeze(0)
             labels = labels.to(tm.device).unsqueeze(0)
 
             model.eval()
@@ -139,4 +141,4 @@ def eval_files(folder, sample):
         print(f"Avg. rmsq error: {(rmse / epochs):.4f}")
 
 if __name__ == "__main__":
-    eval_files("ff_models", sample = True)
+    eval_files("fwd_models", sample = True) # See docstring for details

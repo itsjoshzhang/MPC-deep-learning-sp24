@@ -73,7 +73,11 @@ DATA = pickle.load(open("data_new.pkl", "rb"))
 dataset = RobotData(DATA)
 
 def train_model(model_type):
-
+    """
+    Returns None on successful training
+    Returns 1 & exits when v_loss > 0.1
+    Prints debug msg if v_loss plateaus
+    """
     t_size = int(len(dataset) * 0.8)
     v_size = len(dataset) - t_size
 
@@ -90,7 +94,7 @@ def train_model(model_type):
     patience = 0
 
     name = str(model_type).split(".")[1].split("_")[0]
-    path = f"models/{name}_{HIDDEN}_{LAYERS}_{BATCH_S}.pt"
+    path = f"m/{name}_{HIDDEN}_{LAYERS}_{BATCH_S}.pt" # File name must follow setup_n_eval
     print(f"Training {path}:")
 
     for i in range(EPOCHS):

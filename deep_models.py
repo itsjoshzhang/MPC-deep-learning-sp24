@@ -86,8 +86,8 @@ class LSTM_Model(nn.Module):
             self.init_hidden(x.size(0))
 
         # Detach to avoid backprop thru time
-        unhook = (self.h_state[0].detach(), self.h_state[1].detach())
-        output, self.h_state = self.lstm(x, unhook)
+        detach = (self.h_state[0].detach(), self.h_state[1].detach())
+        output, self.h_state = self.lstm(x, detach)
         return self.full_c(output[:, -1, :]) # shape (BATCH_S, OUTPUT)
 
 INPUTS = 8      # [pos.(2), orient.(1), vel.(3), acceleration (2)]
@@ -104,12 +104,18 @@ DATA = pickle.load(open("data_new.pkl", "rb"))
 dataset = RobotData(DATA, FT_SIZE)
 
 def train_model(model_type):
-
+    """
+    Returns None on successful training
+    Returns 1 & exits when v_loss > 0.1
+    Prints debug msg if v_loss plateaus
+    Resets hidden states at every epoch
+        if STATE_F = True (stateful rnn)
+    """
     t_size = int(len(dataset) * 0.8)
     v_size = len(dataset) - t_size
 
     t_data, v_data = random_split(dataset, [t_size, v_size])
-    t_load = DataLoader(t_data, batch_size=BATCH_S, shuffle=False)
+    t_load = DataLoader(t_data, batch_size=BATCH_S, shuffle=False) # Avoid shuffling for time-data RNNs
     v_load = DataLoader(v_data, batch_size=BATCH_S, shuffle=False)
 
     model  = model_type(INPUTS, HIDDEN, OUTPUT, LAYERS, STATE_F).to(device)
@@ -121,7 +127,7 @@ def train_model(model_type):
     patience = 0
 
     name = str(model_type).split(".")[1].split("_")[0]
-    path = f"models/{name}_{HIDDEN}_{LAYERS}_{FT_SIZE}_{BATCH_S}_{STATE_F}.pt"
+    path = f"rnn_models/{name}_{HIDDEN}_{LAYERS}_{FT_SIZE}_{BATCH_S}_{STATE_F}.pt"
     print(f"Training {path}:")
 
     for i in range(100):
