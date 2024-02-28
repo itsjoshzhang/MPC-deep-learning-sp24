@@ -1,14 +1,9 @@
-import os
-import torch
 import pickle
-import random
-import basic_model as tm
 
 """
-Format of __misc__ / data_old.pkl
-
+Format of data_old.pkl
 DICT:   (SIZE)
----------------
+=================
 Data:    (80)
     Keys = "DAgger_XXX_GPS_0.db3"
     Vals (100+) = <dict> Bag
@@ -34,7 +29,7 @@ Msg:
     "lap_num"   = ...
 """
 
-DATA = pickle.load(open("__misc__/data_old.pkl", "rb"))
+DATA = pickle.load(open("data_old.pkl", "rb"))
 
 def print_keys():
     """
@@ -90,55 +85,6 @@ def setup_data(cut_time = 1.00):
     print(f"\n{len(data_list)} rosbags, {size(len)} messages, and {size(sum)} datapoints parsed.")
     return data_list
 
-def eval_files(folder, sample):
-    """
-    Eval all models in folder
-    w/ mean abs. error & rmse
-    if sample = True:
-        Use 10k random points
-    else: All 60k data points
-    """
-    dataset = tm.RobotData(tm.DATA)
-    curr_h  = 0
-
-    for file in sorted(os.listdir(folder)):
-        name = file.split("_")
-        model_type = eval(f"tm.{name[0]}_Model")
-        
-        inputs = tm.INPUTS
-        output = tm.OUTPUT
-        hidden = int(name[1])
-        layers = int(name[2])
-
-        model = model_type(inputs, hidden, output, layers, False)
-        model.load_state_dict(torch.load(f"{folder}/{file}", map_location="cpu"))
-        
-        if curr_h != hidden:
-            print("\n=======================")
-            curr_h = hidden
-
-        diff, rmse = 0, 0
-        if sample: epochs = 10000
-        else: epochs = len(dataset)
-
-        for i in range(epochs):
-            if sample:
-                i = random.randint(0, len(dataset) - 1)
-            featrs, labels = dataset[i]
-            
-            featrs = featrs.to(tm.device).unsqueeze(0)
-            labels = labels.to(tm.device).unsqueeze(0)
-
-            model.eval()
-            with torch.no_grad():
-                output = model(featrs)
-            
-            diff += torch.mean(torch.abs(output - labels)).item()
-            rmse += torch.sqrt(torch.mean((output - labels) ** 2)).item()
-        
-        print(f"\n{file}")
-        print(f"Avg. difference: {(diff / epochs):.4f}")
-        print(f"Avg. rmsq error: {(rmse / epochs):.4f}")
-
 if __name__ == "__main__":
-    eval_files("fwd_models", sample = True) # See docstring for details
+    print_keys()
+    setup_data()

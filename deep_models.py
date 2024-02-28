@@ -100,7 +100,7 @@ BATCH_S = 16
 LEARN_R = 0.001
 STATE_F = False
 
-DATA = pickle.load(open("data_new.pkl", "rb"))
+DATA = pickle.load(open("__misc__/data_new.pkl", "rb"))
 dataset = RobotData(DATA, FT_SIZE)
 
 def train_model(model_type):

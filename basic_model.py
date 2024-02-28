@@ -69,7 +69,7 @@ LEARN_R = 0.001
 DO_DROP = False
 EPOCHS  = 100
 
-DATA = pickle.load(open("data_new.pkl", "rb"))
+DATA = pickle.load(open("__misc__/data_new.pkl", "rb"))
 dataset = RobotData(DATA)
 
 def train_model(model_type):
