@@ -93,8 +93,8 @@ def train_model(model_type):
     min_loss = float('inf')
     patience = 0
 
-    name = str(model_type).split(".")[1].split("_")[0]
-    path = f"m/{name}_{HIDDEN}_{LAYERS}_{BATCH_S}.pt" # File name must follow setup_n_eval
+    name = str(model_type).split(".")[1].split("_")[0] # str() -> "<class file.Type_Model>"
+    path = f"m/{name}_{HIDDEN}_{LAYERS}_{BATCH_S}.pt"  # File names must follow eval_models
     print(f"Training {path}:")
 
     for i in range(EPOCHS):

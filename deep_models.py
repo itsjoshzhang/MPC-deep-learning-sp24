@@ -115,7 +115,7 @@ def train_model(model_type):
     v_size = len(dataset) - t_size
 
     t_data, v_data = random_split(dataset, [t_size, v_size])
-    t_load = DataLoader(t_data, batch_size=BATCH_S, shuffle=False) # Avoid shuffling for time-data RNNs
+    t_load = DataLoader(t_data, batch_size=BATCH_S, shuffle=False) # Avoid shuffling for time data RNNs
     v_load = DataLoader(v_data, batch_size=BATCH_S, shuffle=False)
 
     model  = model_type(INPUTS, HIDDEN, OUTPUT, LAYERS, STATE_F).to(device)
@@ -126,7 +126,7 @@ def train_model(model_type):
     min_loss = float('inf')
     patience = 0
 
-    name = str(model_type).split(".")[1].split("_")[0]
+    name = str(model_type).split(".")[1].split("_")[0] # str() -> "<class file.Type_Model>"
     path = f"rnn_models/{name}_{HIDDEN}_{LAYERS}_{FT_SIZE}_{BATCH_S}_{STATE_F}.pt"
     print(f"Training {path}:")
 
