@@ -9,13 +9,6 @@ EPOCHS = 10000
 device = torch.device("cpu")
 
 def eval_basic():
-    """
-    Evaluate all files in fwd
-    w/ mean abs. error & rmse
-    if SAMPLE = True:
-        Use 10k random points
-    else: All 60k data points
-    """
     curr_h  = 0
     dataset = fwd.RobotData(fwd.DATA)
 
@@ -38,14 +31,8 @@ def eval_basic():
         calc_error(dataset, model, file)
 
 def eval_deep():
-    """
-    Evaluate all files in rnn
-    w/ mean abs. error & rmse
-    if SAMPLE = True:
-        Use 10k random points
-    else: All 60k data points
-    """
-    curr_h, curr_ft = 0, 0
+    curr_h  = 0
+    curr_ft = 0
     dataset = rnn.dataset
 
     for file in sorted(os.listdir("rnn_models")):
@@ -66,12 +53,14 @@ def eval_deep():
         if curr_h != hidden:
             print("\n=======================")
             curr_h = hidden
+
         if curr_ft != ft_size:
             dataset = rnn.RobotData(rnn.DATA, ft_size)
         
-        calc_error(dataset, model, file)
+        calc_error(dataset, model, file, state_f)
 
-def calc_error(dataset, model, file):
+def calc_error(dataset, model, file, state_f = False):
+
     diff, rmse = 0, 0
     epochs = EPOCHS if SAMPLE else len(dataset)
 
@@ -82,6 +71,10 @@ def calc_error(dataset, model, file):
         featrs, labels = dataset[i]
         featrs = featrs.to(device).unsqueeze(0)
         labels = labels.to(device).unsqueeze(0)
+
+        batch_s = featrs.size(0)
+        if state_f:
+            model.init_hidden(batch_s)
 
         model.eval()
         with torch.no_grad():
@@ -95,5 +88,12 @@ def calc_error(dataset, model, file):
     print(f"Avg. rmsq error: {(rmse / epochs):.4f}")
 
 if __name__ == "__main__":
-    eval_basic() # ADVICE: read docstring for details
+    """
+    Evaluate all files in rnn
+    w/ mean abs. error & rmse
+    if SAMPLE = True:
+        Use 10k random labels
+    else: All 60k data labels
+    """
+    eval_basic()
     eval_deep()

@@ -173,16 +173,16 @@ def train_model(model_type):
 
         if patience > 10:
             print("Early stop triggered.")
-        if v_loss > 0.2:
+        if v_loss > 0.1:
             print("Bad loss. Restarting:")
             return 1
 
 if __name__ == "__main__":
-    for hidden in [16, 64]:
-        for layers in [4, 8]:
-            for batch_s in [16, 64]:
-                for state_f in [True, False]:
-
-                    HIDDEN, LAYERS, BATCH_S, STATE_F = hidden, layers, batch_s, state_f
+    for hidden in [64, 128]:
+        for layers in [2, 4]:
+            for ft_size in [4, 8]:
+                for batch_s in [8, 16]:
+                
+                    HIDDEN, LAYERS, BATCH_S, FT_SIZE = hidden, layers, batch_s, ft_size
                     while train_model(GRU_Model):  continue
                     while train_model(LSTM_Model): continue
