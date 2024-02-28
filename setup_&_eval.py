@@ -5,7 +5,9 @@ import random
 import basic_model as tm
 
 """
-NAME:   (SIZE)
+Format of __misc__ / data_old.pkl
+
+DICT:   (SIZE)
 ---------------
 Data:    (80)
     Keys = "DAgger_XXX_GPS_0.db3"
@@ -32,9 +34,13 @@ Msg:
     "lap_num"   = ...
 """
 
-DATA = pickle.load(open("misc/data_old.pkl", "rb"))
+DATA = pickle.load(open("__misc__/data_old.pkl", "rb"))
 
 def print_keys():
+    """
+    Print keys of rosbag message
+    Useful to debug data_old.pkl
+    """
     for data in DATA.items():
         print(f"\nData ({len(DATA)} items): Keys = {data[0]}, Vals = <dict> Bag.")
 
@@ -51,7 +57,7 @@ def print_keys():
 
 def setup_data(cut_time = 1.00):
     """
-    Returns nested list DATA:
+    Returns nested list data:
         data[x] = bag
         data[x][y] = msg
         data[x][y][z] = point
@@ -84,11 +90,17 @@ def setup_data(cut_time = 1.00):
     print(f"\n{len(data_list)} rosbags, {size(len)} messages, and {size(sum)} datapoints parsed.")
     return data_list
 
-def eval_files(sample):
-    dataset = tm.RobotData(tm.DATA)
-    h = 0
+def eval_files(folder, sample):
+    """
+    Eval all models in 
 
-    for file in sorted(os.listdir("models")):
+
+    
+    """
+    dataset = tm.RobotData(tm.DATA)
+    curr_h  = 0
+
+    for file in sorted(os.listdir(folder)):
         name = file.split("_")
         model_type = eval(f"tm.{name[0]}_Model")
         
@@ -97,12 +109,12 @@ def eval_files(sample):
         hidden = int(name[1])
         layers = int(name[2])
 
-        model = model_type(inputs, hidden, output, layers, False).to(tm.device)
-        model.load_state_dict(torch.load(f"models/{file}", map_location="cpu"))
+        model = model_type(inputs, hidden, output, layers, False)
+        model.load_state_dict(torch.load(f"{folder}/{file}", map_location="cpu"))
         
-        if h != hidden:
-            print("\n====================")
-            h = hidden
+        if curr_h != hidden:
+            print("\n=======================")
+            curr_h = hidden
 
         diff, rmse = 0, 0
         epochs = 10000 if sample else 59900
@@ -127,4 +139,4 @@ def eval_files(sample):
         print(f"Avg. rmsq error: {(rmse / epochs):.4f}")
 
 if __name__ == "__main__":
-    eval_files(sample = True)
+    eval_files("ff_models", sample = True)

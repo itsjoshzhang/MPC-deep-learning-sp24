@@ -59,8 +59,8 @@ class Basic_Model(nn.Module):
             x = torch.relu(layer(x))
         return self.layers[-1](x) # No activ func with reg. output
 
-INPUTS = 8      # (pos.(2), orient.(1), vel.(3), acceleration (2))
-OUTPUT = 6      # (positions (2), orientation (1), velocities (3))
+INPUTS = 8      # [pos.(2), orient.(1), vel.(3), acceleration (2)]
+OUTPUT = 6      # [positions (2), orientation (1), velocities (3)]
 HIDDEN = 16
 LAYERS = 4
 

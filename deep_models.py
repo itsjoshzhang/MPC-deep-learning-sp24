@@ -85,12 +85,13 @@ class LSTM_Model(nn.Module):
         if not self.state_f or self.h_state is None:
             self.init_hidden(x.size(0))
 
+        # Detach to avoid backprop thru time
         unhook = (self.h_state[0].detach(), self.h_state[1].detach())
         output, self.h_state = self.lstm(x, unhook)
         return self.full_c(output[:, -1, :]) # shape (BATCH_S, OUTPUT)
 
-INPUTS = 8      # (pos.(2), orient.(1), vel.(3), acceleration (2))
-OUTPUT = 6      # (positions (2), orientation (1), velocities (3))
+INPUTS = 8      # [pos.(2), orient.(1), vel.(3), acceleration (2)]
+OUTPUT = 6      # [positions (2), orientation (1), velocities (3)]
 HIDDEN = 16
 LAYERS = 4
 
@@ -108,7 +109,7 @@ def train_model(model_type):
     v_size = len(dataset) - t_size
 
     t_data, v_data = random_split(dataset, [t_size, v_size])
-    t_load = DataLoader(t_data, batch_size=BATCH_S, shuffle=True)
+    t_load = DataLoader(t_data, batch_size=BATCH_S, shuffle=False)
     v_load = DataLoader(v_data, batch_size=BATCH_S, shuffle=False)
 
     model  = model_type(INPUTS, HIDDEN, OUTPUT, LAYERS, STATE_F).to(device)
@@ -126,6 +127,10 @@ def train_model(model_type):
     for i in range(100):
         model.train()
         for featrs, labels in t_load:
+            batch_s = featrs.size(0)
+
+            if STATE_F:
+                model.init_hidden(batch_s)
             featrs = featrs.to(device)
             labels = labels.to(device)
 
@@ -139,6 +144,10 @@ def train_model(model_type):
         v_loss = 0
         with torch.no_grad():
             for featrs, labels in v_load:
+                batch_s = featrs.size(0)
+                
+                if STATE_F:
+                    model.init_hidden(batch_s)
                 featrs = featrs.to(device)
                 labels = labels.to(device)
             
