@@ -3,8 +3,9 @@ import torch
 import random
 import basic_model as fwd
 import deep_models as rnn
+import matplotlib.pyplot as plt
 
-SAMPLE = True
+SAMPLE = False
 EPOCHS = 10000
 device = torch.device("cpu")
 
@@ -87,6 +88,46 @@ def calc_error(dataset, model, file, state_f = False):
     print(f"Avg. difference: {(diff / epochs):.4f}")
     print(f"Avg. rmsq error: {(rmse / epochs):.4f}")
 
+
+labels = {"x_pos": [],
+              "y_pos": [],
+              "v_long": [],
+              "v_tran": []}
+
+def build_labels(dataset):
+    for point in dataset.labels:
+
+        x_pos = point[0]
+        y_pos = point[1]
+        # e = point[2]
+        # w = point[3]
+        v_long = point[4]
+        v_tran = point[5]
+
+        labels["x_pos"].append(x_pos)
+        labels["y_pos"].append(y_pos)
+        labels["v_long"].append(v_long)
+        labels["v_tran"].append(v_tran)
+
+result = {"x_pos": [],
+            "y_pos": [],
+            "v_long": [],
+            "v_tran": []}
+
+def build_result(output):
+    x_pos = output[0]
+    y_pos = output[1]
+    # e = point[2]
+    # w = point[3]
+    v_long = output[4]
+    v_tran = output[5]
+
+    labels["x_pos"].append(x_pos)
+    labels["y_pos"].append(y_pos)
+    labels["v_long"].append(v_long)
+    labels["v_tran"].append(v_tran)
+
+
 if __name__ == "__main__":
     """
     Evaluate all files in rnn
@@ -95,5 +136,5 @@ if __name__ == "__main__":
         Use 10k random labels
     else: All 60k data labels
     """
-    eval_basic()
+    #eval_basic()
     eval_deep()

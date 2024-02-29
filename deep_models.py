@@ -6,6 +6,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import Dataset, DataLoader, random_split
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+DATA = pickle.load(open("exp_data_clean.pkl", "rb"))
 
 class RobotData(Dataset):
 
@@ -100,7 +101,6 @@ BATCH_S = 16
 LEARN_R = 0.001
 STATE_F = False
 
-DATA = pickle.load(open("__misc__/data_new.pkl", "rb"))
 dataset = RobotData(DATA, FT_SIZE)
 
 def train_model(model_type):
