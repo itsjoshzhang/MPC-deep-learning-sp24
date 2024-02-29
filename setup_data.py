@@ -1,5 +1,5 @@
 import pickle
-import pdb
+import sys
 
 """
 Format of data_old.pkl
@@ -30,15 +30,13 @@ Msg:
     "lap_num"   = ...
 """
 
-DATA = pickle.load(open("__data__/exp_data_raw.pkl", "rb"))
-
-def print_keys():
+def print_keys(pkl_data):
     """
     Print keys of rosbag msg.
-    Use to debug data_old.pkl
+    Use to debug data_raw.pkl
     """
-    for data in DATA.items():
-        print(f"\nData ({len(DATA)} items): Keys = {data[0]}, Vals = <dict> Bag.")
+    for data in pkl_data.items():
+        print(f"\nData ({len(pkl_data)} items): Keys = {data[0]}, Vals = <dict> Bag.")
 
         for bag in data[1].items():
             print(f"Bag ({len(data[1])} items): Keys = {bag[0]}, Vals = <dict> Msg.")
@@ -51,7 +49,7 @@ def print_keys():
                 print(f"{msg[0]} = {vals}")
             return
 
-def setup_data(cut_time = 1.00):
+def setup_data(pkl_data, cut_time = 1.00):
     """
     Returns nested list data:
         data[x] = bag
@@ -61,7 +59,7 @@ def setup_data(cut_time = 1.00):
         of end of test/rosbag
     """
     data_list = []
-    for bag in DATA.values():
+    for bag in pkl_data.values():
         bag_list = []
                                                 # Sort by incr. msg[time]
         bag_sort = sorted(bag.values(), key = lambda msg: msg["t"])
@@ -80,7 +78,6 @@ def setup_data(cut_time = 1.00):
                     msg["u"]["u_a"],        # 6."u" (actuat)= {'u_a',
                     msg["u"]["u_steer"]     # 7.               'u_steer'}
                 ])
-        pdb.set_trace()
         data_list.append(bag_list)
 
     size = lambda func: sum([func([len(msg) for msg in bag]) for bag in data_list])
@@ -88,6 +85,16 @@ def setup_data(cut_time = 1.00):
     return data_list
 
 if __name__ == "__main__":
-    print_keys()
-    data = setup_data()
-    pickle.dump(data, open("exp_data_clean.pkl", "wb"))
+    args = sys.argv
+
+    if len(args) != 2:
+        raise SyntaxError("1 argument required: (name of pkl file)")
+
+    pkl_file = sys.argv[1]
+    pkl_data = pickle.load(open(pkl_file, "rb"))
+
+    print_keys(pkl_data)
+    data = setup_data(pkl_data)
+
+    pkl_name = pkl_file.split(".")[0]
+    pickle.dump(data, open(f"{pkl_name}_clean.pkl", "wb"))
