@@ -25,6 +25,7 @@ def build_mlp(
         size: int,
         activation: Activation = 'tanh',
         output_activation: Activation = 'identity',
+        **params
 ):
     """
         Builds a feedforward neural network
@@ -67,7 +68,7 @@ def init_gpu(use_gpu=True, gpu_id=0):
     if torch.backends.mps.is_available() and use_gpu:
         device = torch.device('mps')
         print("Using MPS.")
-    if torch.cuda.is_available() and use_gpu:
+    elif torch.cuda.is_available() and use_gpu:
         device = torch.device("cuda:" + str(gpu_id))
         print("Using GPU id {}".format(gpu_id))
     else:
