@@ -13,7 +13,7 @@ def eval_basic(one_model = False):
     curr_h  = 0
     dataset = fwd.RobotData(fwd.DATA)
 
-    for file in sorted(os.listdir("fwd_models")):
+    for file in sorted(os.listdir("../model_data/fwd_models")):
         name = file.split("_")
         model_type = eval(f"fwd.{name[0]}_Model")
         
@@ -37,7 +37,7 @@ def eval_deep(one_model = False):
     curr_ft = 0
     dataset = rnn.dataset
 
-    for file in sorted(os.listdir("rnn_models")):
+    for file in sorted(os.listdir("../model_data/rnn_models")):
         name = file.split("_")
         model_type = eval(f"rnn.{name[0]}_Model")
         

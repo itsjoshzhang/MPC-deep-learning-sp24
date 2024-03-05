@@ -1,0 +1,6 @@
+[submodule "mpclab_common"]
+	path = mpclab_common
+	url = git@github.com:MPC-Berkeley/mpclab_common.git
+[submodule "nonplanar_vehicle_navigation"]
+	path = nonplanar_vehicle_navigation
+	url = git@github.com:MPC-Berkeley/nonplanar_vehicle_navigation.git
