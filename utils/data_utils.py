@@ -1,4 +1,5 @@
 import random
+from typing import Union
 
 import numpy as np
 import pickle as pkl
@@ -11,10 +12,16 @@ from mpclab_common.models.dynamics_models import CasadiDynamicBicycle, CasadiDyn
 from mpclab_common.models.model_types import DynamicBicycleConfig
 from mpclab_common.pytypes import VehicleState
 import mpclab_common.track
+from tqdm import tqdm
+import seaborn as sns
+
+from utils.log import setup_custom_logger
 
 q_labels = ['v.v_long', 'v.v_tran', 'w.w_psi', 'x.x', 'x.y', 'e.psi']
 # q_labels = ['v.v_long', 'v.v_tran', 'w.w_psi', 'x.x', 'x.y', 'x.z']
 u_labels = ['u.u_a', 'u.u_steer']
+
+logger = setup_custom_logger('data_utils')
 
 
 class DynamicsDataset(Dataset):
@@ -58,7 +65,7 @@ class DynamicsDataset(Dataset):
         # Interpolating with the standard dt.
         t_interp = np.arange(t[0], t[-1], DATASET_DT)  # Assume t is sorted.
 
-        print("Points in dataset: {}; Points after interp: {}.".format(t.shape[0], t_interp.shape[0]))
+        logger.debug("Points in dataset: {}; Points after interp: {}.".format(t.shape[0], t_interp.shape[0]))
 
         q_interp = np.empty((t_interp.shape[0], q.shape[1]))
         for i in range(q.shape[1]):
@@ -132,16 +139,19 @@ def get_nominal_prediction(dynamics, q, u, dynamics_uses_frenet, track=None,
 
 
 class NoiseDataset(Dataset):
-    def __init__(self, q, u, dq):
-        self.q = q
-        self.u = u
-        self.dq = dq
+    def __init__(self, q, u, dq, threshold=0.1):
+        mask = np.linalg.norm(dq, axis=1) < threshold
+        self.q = q[mask]
+        self.u = u[mask]
+        self.dq = dq[mask]
         assert q.shape[0] == u.shape[0] == dq.shape[0]
 
     @classmethod
-    def from_dataset(cls, dataset: DynamicsDataset, track, dynamics, dynamics_uses_frenet):
+    def from_dataset(cls,
+                     dataset: Union[DynamicsDataset, ConcatDataset],
+                     track, dynamics, dynamics_uses_frenet, threshold=0.1):
         qs, us, dqs = [], [], []
-        for q, u, next_q in dataset:
+        for q, u, next_q in tqdm(dataset):
             last_q, last_u = q[-1], u[-1]
             try:
                 nominal_next_q = get_nominal_prediction(dynamics, last_q, last_u, dynamics_uses_frenet, track)
@@ -153,7 +163,7 @@ class NoiseDataset(Dataset):
             dqs.append(dq)
 
         q, u, dq = np.asarray(qs), np.asarray(us), np.asarray(dqs)
-        return cls(q, u, dq)
+        return cls(q, u, dq, threshold=threshold)
 
     def __len__(self):
         return self.q.shape[0]
@@ -163,9 +173,21 @@ class NoiseDataset(Dataset):
 
 
 if __name__ == '__main__':
-    track_name = 'L_track_barc'
-    track = mpclab_common.track.get_track(track_name)
-    dt = 0.1
+    import argparse
+    parser = argparse.ArgumentParser(description='')
+    parser.add_argument('--threshold', type=float, default=0.1, help='Maximum allowed error')
+    parser.add_argument('--dt', type=float, default=0.1, help='Discretization step for the nominal model')
+    parser.add_argument('--history', type=int, default=3, help='maximum size of the buffer')
+    parser.add_argument('--track_name', type=str, default='L_track_barc', help='name of the track')
+    parser.add_argument('--load_previous', action='store_true', help='load previous dataset instead')
+
+    params = vars(parser.parse_args())
+
+    track_name = params['track_name']
+    dt = params['dt']
+    history = params['history']
+
+    track = mpclab_common.track.get_track(params['track_name'])
 
     dynamics_config = DynamicBicycleConfig(dt=dt,
                                            track_name=track_name,
@@ -179,14 +201,19 @@ if __name__ == '__main__':
     # dynamics_uses_frenet = False
 
     # file_name = '../data/pid_data.pkl'
-    file_name = '../data/mpc_data.pkl'
+    # file_name = '../data/mpc_data.pkl'
     file_name = '../data/old_data.pkl'
-    dynamics_dataset = DynamicsDataset.from_pickle(file_name, dt=dt, history=3)
-    noise_dataset = NoiseDataset.from_dataset(dynamics_dataset, track, dynamics,
-                                              dynamics_uses_frenet=dynamics_uses_frenet)
-    with open("../data/noise_dataset_old_3.pkl", "wb") as f:
-        pkl.dump(noise_dataset, f)
-    x, y, z = [], [], []
+    if params['load_previous']:
+        with open(f"../data/noise_dataset_old_{history}.pkl", "rb") as f:
+            noise_dataset = pkl.load(f)
+    else:
+        dynamics_dataset = DynamicsDataset.from_pickle(file_name, dt=dt, history=history)
+        noise_dataset = NoiseDataset.from_dataset(dynamics_dataset, track, dynamics,
+                                                  dynamics_uses_frenet=dynamics_uses_frenet,
+                                                  threshold=params['threshold'])
+        with open(f"../data/noise_dataset_old_{history}.pkl", "wb") as f:
+            pkl.dump(noise_dataset, f)
+    x, y, z, dx, dy = [], [], [], [], []
     for q, u, dq in noise_dataset:
         err = np.linalg.norm((dq[3], dq[4]))
         # if err > 0.2:
@@ -194,12 +221,37 @@ if __name__ == '__main__':
         x.append(q[-1][3])
         y.append(q[-1][4])
         z.append(err)
+        dx.append(dq[3])
+        dy.append(dq[4])
 
     fig = plt.figure()
-    ax = fig.add_subplot(projection='3d')
-    ax.scatter(x, y, z, c='k', linestyle='-', marker='.')
-    ax.set_title('Distribution of l-2 norm of prediction error')
-    ax.set_xlabel('x (m)')
-    ax.set_ylabel('y (m)')
-    ax.set_zlabel('error (m)')
+    ax_3d = fig.add_subplot(2, 2, 1, projection='3d')
+    ax_norm = fig.add_subplot(2, 2, 2)
+    ax_x = fig.add_subplot(2, 2, 3)
+    ax_y = fig.add_subplot(2, 2, 4)
+    ax_3d.scatter(x, y, z, c='k', linestyle='-', marker='.')
+    ax_3d.set_title('Distribution of l-2 norm of prediction error')
+    ax_3d.set_xlabel('x (m)')
+    ax_3d.set_ylabel('y (m)')
+    ax_3d.set_zlabel('error (m)')
+
+    # ax_hist.hist(z)
+    hist = sns.histplot(data=z, ax=ax_norm)
+    hist.set(xlabel='l-2 norm of error')
+    labels = [str(v) if v else '' for v in hist.containers[0].datavalues]
+    hist.bar_label(hist.containers[0], label=labels)
+    ax_norm.set_title("Error Norm Distribution")
+
+    hist_x = sns.histplot(data=dx, ax=ax_x)
+    hist_x.set(xlabel='x error')
+    labels = [str(v) if v else '' for v in hist_x.containers[0].datavalues]
+    hist_x.bar_label(hist_x.containers[0], label=labels)
+    ax_x.set_title("X-Error Distribution")
+
+    hist_y = sns.histplot(data=dy, ax=ax_y)
+    hist_y.set(xlabel='y error')
+    labels = [str(v) if v else '' for v in hist_y.containers[0].datavalues]
+    hist_y.bar_label(hist_y.containers[0], label=labels)
+    ax_y.set_title("Y-Error Distribution")
+
     plt.show()

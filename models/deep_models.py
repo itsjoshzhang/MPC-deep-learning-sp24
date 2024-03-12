@@ -8,6 +8,7 @@ from torch.utils.data import Dataset, DataLoader, random_split
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DATA = pickle.load(open("../mpc_data_clean.pkl", "rb"))
 
+
 class RobotData(Dataset):
 
     def __init__(self, data, size):
@@ -15,11 +16,11 @@ class RobotData(Dataset):
         self.size = size
 
         for bag in data:
-            for i in range(len(bag)-size-1):    # -1 to ensure <size> messages + 1 for label
-                featr = bag[i: i + size]        # Extract sequence of length <size> messages
+            for i in range(len(bag) - size - 1):  # -1 to ensure <size> messages + 1 for label
+                featr = bag[i: i + size]  # Extract sequence of length <size> messages
 
                 featrs.append(featr)
-                label = bag[i + size][:6]       # Next state (excluding time / acceleration)
+                label = bag[i + size][:6]  # Next state (excluding time / acceleration)
                 labels.append(label)
 
         self.featrs = torch.tensor(featrs, dtype=torch.float32).to(device)
@@ -28,9 +29,9 @@ class RobotData(Dataset):
 
     def norm(self):
         f_mean = torch.mean(self.featrs, dim=0)
-        f_std  = torch.std (self.featrs, dim=0)
+        f_std = torch.std(self.featrs, dim=0)
         l_mean = torch.mean(self.labels, dim=0)
-        l_std  = torch.std (self.labels, dim=0)
+        l_std = torch.std(self.labels, dim=0)
 
         self.featrs = (self.featrs - f_mean) / f_std
         self.labels = (self.labels - l_mean) / l_std
@@ -40,6 +41,7 @@ class RobotData(Dataset):
 
     def __getitem__(self, i):
         return self.featrs[i], self.labels[i]
+
 
 class GRU_Model(nn.Module):
 
@@ -63,7 +65,8 @@ class GRU_Model(nn.Module):
 
         # Detach to avoid backprop thru time
         output, self.h_state = self.gru(x, self.h_state.detach())
-        return self.full_c(output[:, -1, :]) # shape (BATCH_S, OUTPUT)
+        return self.full_c(output[:, -1, :])  # shape (BATCH_S, OUTPUT)
+
 
 class LSTM_Model(nn.Module):
 
@@ -89,10 +92,11 @@ class LSTM_Model(nn.Module):
         # Detach to avoid backprop thru time
         detach = (self.h_state[0].detach(), self.h_state[1].detach())
         output, self.h_state = self.lstm(x, detach)
-        return self.full_c(output[:, -1, :]) # shape (BATCH_S, OUTPUT)
+        return self.full_c(output[:, -1, :])  # shape (BATCH_S, OUTPUT)
 
-INPUTS = 8      # [pos.(2), orient.(1), vel.(3), acceleration (2)]
-OUTPUT = 6      # [positions (2), orientation (1), velocities (3)]
+
+INPUTS = 8  # [pos.(2), orient.(1), vel.(3), acceleration (2)]
+OUTPUT = 6  # [positions (2), orientation (1), velocities (3)]
 HIDDEN = 16
 LAYERS = 4
 
@@ -102,6 +106,7 @@ LEARN_R = 0.001
 STATE_F = False
 
 dataset = RobotData(DATA, FT_SIZE)
+
 
 def train_model(model_type):
     """
@@ -115,10 +120,10 @@ def train_model(model_type):
     v_size = len(dataset) - t_size
 
     t_data, v_data = random_split(dataset, [t_size, v_size])
-    t_load = DataLoader(t_data, batch_size=BATCH_S, shuffle=False) # Avoid shuffling for time data RNNs
+    t_load = DataLoader(t_data, batch_size=BATCH_S, shuffle=False)  # Avoid shuffling for time data RNNs
     v_load = DataLoader(v_data, batch_size=BATCH_S, shuffle=False)
 
-    model  = model_type(INPUTS, HIDDEN, OUTPUT, LAYERS, STATE_F).to(device)
+    model = model_type(INPUTS, HIDDEN, OUTPUT, LAYERS, STATE_F).to(device)
     optimizer = optim.Adam(model.parameters(), lr=LEARN_R)
     scheduler = ReduceLROnPlateau(optimizer)
 
@@ -126,7 +131,7 @@ def train_model(model_type):
     min_loss = float('inf')
     patience = 0
 
-    name = str(model_type).split(".")[1].split("_")[0] # str() -> "<class file.Type_Model>"
+    name = str(model_type).split(".")[1].split("_")[0]  # str() -> "<class file.Type_Model>"
     path = f"rnn_models/{name}_{HIDDEN}_{LAYERS}_{FT_SIZE}_{BATCH_S}_{STATE_F}.pt"
     print(f"Training {path}:")
 
@@ -145,22 +150,22 @@ def train_model(model_type):
             loss = criterion(output, labels)
             loss.backward()
             optimizer.step()
-        
+
         model.eval()
         v_loss = 0
         with torch.no_grad():
             for featrs, labels in v_load:
                 batch_s = featrs.size(0)
-                
+
                 if STATE_F:
                     model.init_hidden(batch_s)
                 featrs = featrs.to(device)
                 labels = labels.to(device)
-            
+
                 output = model(featrs)
                 loss = criterion(output, labels)
                 v_loss += loss.item()
-        
+
         v_loss /= len(v_load)
         scheduler.step(v_loss)
         print(f"Epoch {i + 1}: valid_loss = {v_loss:.4f}")
@@ -169,7 +174,8 @@ def train_model(model_type):
             min_loss = v_loss
             patience = 0
             torch.save(model.state_dict(), path)
-        else: patience += 1
+        else:
+            patience += 1
 
         if patience > 10:
             print("Early stop triggered.")
@@ -177,12 +183,13 @@ def train_model(model_type):
             print("Bad loss. Restarting:")
             return 1
 
+
 if __name__ == "__main__":
     for hidden in [64, 128]:
         for layers in [2, 4]:
             for ft_size in [4, 8]:
                 for batch_s in [8, 16]:
-                
+
                     HIDDEN, LAYERS, BATCH_S, FT_SIZE = hidden, layers, batch_s, ft_size
                     while train_model(GRU_Model):  continue
                     while train_model(LSTM_Model): continue
