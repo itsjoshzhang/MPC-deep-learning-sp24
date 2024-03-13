@@ -6,7 +6,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import Dataset, DataLoader, random_split
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-DATA = pickle.load(open("mpc_data_clean.pkl", "rb"))
+DATA = pickle.load(open("../mpc_data_clean.pkl", "rb"))
 
 class RobotData(Dataset):
 
