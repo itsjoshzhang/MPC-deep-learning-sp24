@@ -1,15 +1,17 @@
 import os
+import sys
 import torch
 import random
 import basic_model as fwd
 import deep_models as rnn
 import matplotlib.pyplot as plt
 
-SAMPLE = False
+SAMPLE = True
 EPOCHS = 10000
 device = torch.device("cpu")
 
-def eval_basic(one_model = False):
+
+def eval_basic(one_model = True):
     curr_h  = 0
     dataset = fwd.RobotData(fwd.DATA)
 
@@ -32,7 +34,7 @@ def eval_basic(one_model = False):
         calc_error(dataset, model, file)
         if one_model: return
 
-def eval_deep(one_model = False):
+def eval_deep(one_model = True):
     curr_h  = 0
     curr_ft = 0
     dataset = rnn.dataset
@@ -83,8 +85,8 @@ def calc_error(dataset, model, file, state_f = False):
         with torch.no_grad():
             output = model(featrs)
         
-        build_labels(labels[0])
-        build_result(output[0])
+        build_test(labels[0], params)
+        build_test(output[0], result)
 
         diff += torch.mean(torch.abs(output - labels)).item()
         rmse += torch.sqrt(torch.mean((output - labels) ** 2)).item()
@@ -94,52 +96,40 @@ def calc_error(dataset, model, file, state_f = False):
     print(f"Avg. rmsq error: {(rmse / epochs):.4f}")
 
 
-labels = {"x_pos": [],
-              "y_pos": [],
-              "v_long": [],
-              "v_tran": []}
-
-def build_labels(label):
-    x_pos = label[0]
-    y_pos = label[1]
-    # e = label[2]
-    # w = label[3]
-    v_long = label[4]
-    v_tran = label[5]
-
-    labels["x_pos"].append(x_pos)
-    labels["y_pos"].append(y_pos)
-    labels["v_long"].append(v_long)
-    labels["v_tran"].append(v_tran)
+params = {"x_pos": [],
+          "y_pos": [],
+          "v_long": [],
+          "v_tran": []}
 
 result = {"x_pos": [],
-            "y_pos": [],
-            "v_long": [],
-            "v_tran": []}
+          "y_pos": [],
+          "v_long": [],
+          "v_tran": []}
 
-def build_result(output):
-    x_pos = output[0]
-    y_pos = output[1]
-    # e = point[2]
-    # w = point[3]
-    v_long = output[4]
-    v_tran = output[5]
+def build_test(in_arr, out_dict):
+    x_pos = in_arr[0]
+    y_pos = in_arr[1]
+    # e = in_arr[2]
+    # w = in_arr[3]
+    v_long = in_arr[4]
+    v_tran = in_arr[5]
 
-    result["x_pos"].append(x_pos)
-    result["y_pos"].append(y_pos)
-    result["v_long"].append(v_long)
-    result["v_tran"].append(v_tran)
+    out_dict["x_pos"].append(x_pos)
+    out_dict["y_pos"].append(y_pos)
+    out_dict["v_long"].append(v_long)
+    out_dict["v_tran"].append(v_tran)
 
-def visualize_results():
+
+def view_test():
     fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)
     attrs = list(result.keys())
     axes = [ax1, ax2, ax3, ax4]
     
-    for _, (attr, ax) in enumerate(zip(attrs, axes)):
-        ax.plot(result[attr], label='prediction')
-        ax.plot(labels[attr], label='actual')
-        ax.set_title(attr)
-        ax.legend()
+    for _, (attr, axis) in enumerate(zip(attrs, axes)):
+        axis.plot(result[attr], label='prediction')
+        axis.plot(params[attr], label='actual')
+        axis.set_title(attr)
+        axis.legend()
     plt.show()
 
 if __name__ == "__main__":
@@ -150,6 +140,11 @@ if __name__ == "__main__":
         Use 10k random labels
     else: All 60k data labels
     """
-    eval_basic(one_model = True)
-    visualize_results()
-    #eval_deep()
+    args = sys.argv
+    if len(args) != 3:
+        raise SyntaxError("2 arguments required: (name of function), (True/False for SAMPLE)")
+    
+    method = eval(sys.argv[1])
+    SAMPLE = eval(sys.argv[2])
+    method(one_model = True)
+    view_test()

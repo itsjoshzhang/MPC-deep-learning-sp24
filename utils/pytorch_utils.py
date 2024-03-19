@@ -1,11 +1,10 @@
 """Pytorch utilities. (Credit: CS285 homework)"""
-from typing import Union
 
 import torch
-from torch import nn
+import torch.nn as nn
+from typing import Union
 
 Activation = Union[str, nn.Module]
-
 
 _str_to_activation = {
     'relu': nn.ReLU(),
@@ -17,7 +16,6 @@ _str_to_activation = {
     'identity': nn.Identity(),
 }
 
-
 def build_mlp(
         input_size: int,
         output_size: int,
@@ -25,8 +23,7 @@ def build_mlp(
         size: int,
         activation: Activation = 'tanh',
         output_activation: Activation = 'identity',
-        **params
-):
+        **params):
     """
         Builds a feedforward neural network
 
@@ -59,9 +56,7 @@ def build_mlp(
     layers.append(output_activation)
     return nn.Sequential(*layers)
 
-
 device = None
-
 
 def init_gpu(use_gpu=True, gpu_id=0):
     global device
@@ -75,14 +70,11 @@ def init_gpu(use_gpu=True, gpu_id=0):
         device = torch.device("cpu")
         print("GPU not detected. Defaulting to CPU.")
 
-
 def set_device(gpu_id):
     torch.cuda.set_device(gpu_id)
 
-
 def from_numpy(*args, **kwargs):
     return torch.from_numpy(*args, **kwargs).float().to(device)
-
 
 def to_numpy(tensor):
     return tensor.to('cpu').detach().numpy()

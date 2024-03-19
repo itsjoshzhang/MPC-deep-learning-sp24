@@ -8,7 +8,6 @@ from torch.utils.data import Dataset, DataLoader, random_split
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DATA = pickle.load(open("../mpc_data_clean.pkl", "rb"))
 
-
 class RobotData(Dataset):
 
     def __init__(self, data, size):
@@ -42,7 +41,6 @@ class RobotData(Dataset):
     def __getitem__(self, i):
         return self.featrs[i], self.labels[i]
 
-
 class GRU_Model(nn.Module):
 
     def __init__(self, inputs, hidden, output, layers, state_f):
@@ -66,7 +64,6 @@ class GRU_Model(nn.Module):
         # Detach to avoid backprop thru time
         output, self.h_state = self.gru(x, self.h_state.detach())
         return self.full_c(output[:, -1, :])  # shape (BATCH_S, OUTPUT)
-
 
 class LSTM_Model(nn.Module):
 
@@ -94,7 +91,6 @@ class LSTM_Model(nn.Module):
         output, self.h_state = self.lstm(x, detach)
         return self.full_c(output[:, -1, :])  # shape (BATCH_S, OUTPUT)
 
-
 INPUTS = 8  # [pos.(2), orient.(1), vel.(3), acceleration (2)]
 OUTPUT = 6  # [positions (2), orientation (1), velocities (3)]
 HIDDEN = 16
@@ -106,7 +102,6 @@ LEARN_R = 0.001
 STATE_F = False
 
 dataset = RobotData(DATA, FT_SIZE)
-
 
 def train_model(model_type):
     """
@@ -182,7 +177,6 @@ def train_model(model_type):
         if v_loss > 0.1:
             print("Bad loss. Restarting:")
             return 1
-
 
 if __name__ == "__main__":
     for hidden in [64, 128]:

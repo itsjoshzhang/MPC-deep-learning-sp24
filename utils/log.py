@@ -1,6 +1,5 @@
 import logging
 
-
 class CustomFormatter(logging.Formatter):
 
     red = "\x1b[31;20m"
@@ -20,12 +19,10 @@ class CustomFormatter(logging.Formatter):
         logging.ERROR: red + _format + reset,
         logging.CRITICAL: bold_red + _format + reset
     }
-
     def format(self, record):
         log_fmt = self.FORMATS.get(record.levelno)
         formatter = logging.Formatter(log_fmt)
         return formatter.format(record)
-
 
 def setup_custom_logger(name, filename: str = None, level=logging.DEBUG, console_level=logging.DEBUG):
     logger = logging.getLogger(name)
@@ -42,9 +39,7 @@ def setup_custom_logger(name, filename: str = None, level=logging.DEBUG, console
         fh = logging.FileHandler('logs/' + filename)
         fh.setLevel(logging.DEBUG)
         logger.addHandler(fh)
-
     return logger
-
 
 if __name__ == '__main__':
     logger = setup_custom_logger('test')

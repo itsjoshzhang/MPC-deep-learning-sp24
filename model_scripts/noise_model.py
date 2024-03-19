@@ -1,23 +1,20 @@
-import copy
 import os
+import numpy as np
+import mpclab_common
 from collections import deque
 
-import mpclab_common
-import numpy as np
 import torch
 import torch.nn as nn
-# from torch.
-from mpclab_common.models.model_types import DynamicBicycleConfig
-from torch.optim import Adam
+import torch.optim as optim
 
-from mpclab_common.models.dynamics_models import CasadiDynamicCLBicycle
 from mpclab_common.track import get_track
 from mpclab_common.pytypes import VehicleState
+from mpclab_common.models.model_types import DynamicBicycleConfig
+from mpclab_common.models.dynamics_models import CasadiDynamicCLBicycle
+
 from utils.data_utils import q_local_to_global, q_global_to_local, q_labels, u_labels
 from utils.log import setup_custom_logger
-
 import utils.pytorch_utils as ptu
-
 
 class FeedforwardNoiseModel(nn.Module):
     def __init__(self, state_size, action_size, history, **params):
@@ -53,10 +50,6 @@ class FeedforwardNoiseModel(nn.Module):
     def load(self, path='../model_data', name='noise_model.pkl'):
         self.model.load_state_dict(torch.load(os.path.join(path, name)))
         self.model.to(ptu.device)
-
-
-class LSTMNoiseModel(nn.Module):
-    """"""
 
 class CasadiDynamicCLBicycleNoise:
     def __init__(self,
@@ -117,7 +110,6 @@ class CasadiDynamicCLBicycleNoise:
         next_q = self.get_prediction(q.reshape(q.shape[0], -1), u)  # TODO: create a buffer in this class. Pass the buffer as q here.
         self.nominal_model.q2state(state, next_q)
 
-
 class DynamicsNN(CasadiDynamicCLBicycleNoise):
     def get_prediction(self, q, u, vehicle_state=VehicleState(t=0)) -> np.ndarray:
         assert len(q.shape) == 1 and len(u.shape) == 1
@@ -134,7 +126,6 @@ class DynamicsNN(CasadiDynamicCLBicycleNoise):
 
     def step(self, state: VehicleState) -> None:
         raise NotImplementedError
-
 
 if __name__ == '__main__':
     track_name = 'L_track_barc'
@@ -161,5 +152,4 @@ if __name__ == '__main__':
         dynamics_uses_frenet=dynamics_uses_frenet,
         track=track
     )
-
     data = './data/old_data.pkl'

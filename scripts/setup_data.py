@@ -2,7 +2,7 @@ import pickle
 import sys
 
 """
-Format of data_old.pkl
+Rosbag pkl file format
 DICT:   (SIZE)
 =================
 Data:    (80)

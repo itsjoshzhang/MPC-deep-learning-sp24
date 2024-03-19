@@ -1,17 +1,15 @@
-import os.path
-import unittest
-
-import numpy as np
+import os
 import torch
-from matplotlib import pyplot as plt
+import argparse
+import numpy as np
 
+from matplotlib import pyplot as plt
 from mpclab_common.track import get_track
 from mpclab_common.models.dynamics_models import DynamicBicycleConfig, CasadiDynamicCLBicycle
 
-from models.noise_model import FeedforwardNoiseModel, CasadiDynamicCLBicycleNoise, DynamicsNN
+from model_scripts.noise_model import FeedforwardNoiseModel, CasadiDynamicCLBicycleNoise, DynamicsNN
 from utils.data_utils import DynamicsDataset, NoiseDataset, q_labels, u_labels
 from utils.log import setup_custom_logger
-
 
 logger = setup_custom_logger('test')
 
@@ -101,11 +99,9 @@ def visualize_trajectories(trajectories, labels, save_plots, *args):
         plt.savefig(f'../plots/{"_".join([str(x) for x in args])}.png')
     plt.show()
 
-
 if __name__ == '__main__':
-    import argparse
-
     parser = argparse.ArgumentParser()
+    
     parser.add_argument('--seed', type=int, default=42, help='random seed')
     parser.add_argument('--file_name', type=str, help='pickle file name stem for rosbag dict')
     parser.add_argument('--dt', type=float, default=0.1, help='Discretization timestep for the dynamics')
@@ -125,7 +121,6 @@ if __name__ == '__main__':
                         help='model trained on noise/dynamics')
 
     params = vars(parser.parse_args())
-
     np.random.seed(params['seed'])
     torch.manual_seed(params['seed'])
 

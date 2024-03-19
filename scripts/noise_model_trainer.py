@@ -1,33 +1,32 @@
-import argparse
 import logging
-import os
-
-import mpclab_common
+import argparse
 import numpy as np
-import pickle as pkl
+import mpclab_common
 
 import torch
 import torch.nn as nn
+import torch.optim as optim
+
 from mpclab_common.models.dynamics_models import CasadiDynamicCLBicycle
 from mpclab_common.models.model_types import DynamicBicycleConfig
-from torch.optim import Adam
+
 from torch.optim.lr_scheduler import ExponentialLR
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
+
 from sklearn.model_selection import train_test_split
+from model_scripts.noise_model import FeedforwardNoiseModel, CasadiDynamicCLBicycleNoise
 
-from models.noise_model import FeedforwardNoiseModel, CasadiDynamicCLBicycleNoise
 from utils.data_utils import NoiseDataset, DynamicsDataset, q_labels, u_labels
-from utils import pytorch_utils as ptu
 from utils.log import setup_custom_logger
-
+from utils import pytorch_utils as ptu
 
 class ModelTrainer:
     def __init__(self, model: FeedforwardNoiseModel, comment='', lr=1e-3, no_logging=False, behavior='noise'):
         self.model = model
 
         self.loss = nn.MSELoss()
-        self.optimizer = Adam(self.model.parameters(), lr=lr)
+        self.optimizer = optim.Adam(self.model.parameters(), lr=lr)
         self.scheduler = ExponentialLR(self.optimizer, gamma=0.99)
         self.behavior = behavior
 
@@ -37,11 +36,10 @@ class ModelTrainer:
             self.writer = SummaryWriter(comment=comment)
 
     def get_logger(self):
-        """mpclab API"""
         return self.logger
 
     def training_step(self, train_loader, val_loader):
-        # Train
+        # Training
         self.model.train()
         train_losses = []
         for q, u, dq in train_loader:
@@ -56,7 +54,7 @@ class ModelTrainer:
             train_losses.append(loss.item())
         mean_train_loss = np.mean(train_losses)
 
-        # Validate
+        # Validation
         self.model.eval()
         val_losses = []
         with torch.no_grad():
@@ -98,7 +96,6 @@ class ModelTrainer:
     def load(self, path='../model_data'):
         self.model.load(path, name=f'{self.behavior}_model.pkl')
 
-
 def get_data(behavior='noise', noise_threshold=0.1):
     dataset = None
     if behavior == 'noise':
@@ -118,7 +115,6 @@ def get_data(behavior='noise', noise_threshold=0.1):
         dataset = DynamicsDataset.from_pickle('../data/old_data.pkl', dt=params['dt'],
                                               history=params['history'])
     return dataset
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
