@@ -14,14 +14,11 @@ from mpclab_common.models.dynamics_models import CasadiDynamicBicycle, CasadiDyn
 from mpclab_common.models.model_types import DynamicBicycleConfig
 from mpclab_common.pytypes import VehicleState
 
-q_labels = ['v.v_long', 'v.v_tran', 'w.w_psi', 'x.x', 'x.y', 'e.psi']
-u_labels = ['u.u_a', 'u.u_steer']
-
 logger = setup_custom_logger('data_utils')
 
 class DynamicsDataset(Dataset):
 
-    def __init__(self, q, u, dt, *, DATASET_DT=0.02, history=1):
+    def __init__(self, q, u, dt, DATASET_DT=0.02, history=1):
         
         assert q.shape[0] == u.shape[0], "q and u doesn't match in n_entries. "
         step = int(dt // DATASET_DT)
@@ -40,11 +37,10 @@ class DynamicsDataset(Dataset):
             f"Found {self.q.shape[0]} entries, while history is {self.history}. ")
 
     @classmethod
-    def from_dict(cls, data, dt, DATASET_DT=0.02, history=1):
-        """
-        data: Nested OrderedDict converted from a single rosbag. Created on 3/4/24 based on mpclab_common.
-        DATASET_DT: Based on the sampling frequency of the estimator.
-        """
+    def from_dict(cls, data, dt, DATASET_DT=0.02, history=1, plot=False):
+        
+        # data: Nested OrderedDict converted from a single rosbag. Created on 3/4/24 based on mpclab_common.
+        # DATASET_DT: Based on the sampling frequency of the estimator.
         qs, us, ts = [], [], []
 
         for t, state in data.items():
@@ -55,15 +51,14 @@ class DynamicsDataset(Dataset):
             u = np.array([state['u']['u_a'], state['u']['u_steer']])
             if np.allclose(u, np.array([1, 0])) or np.allclose(u, 0):
                 continue
-
             qs.append(q)
             us.append(u)
             ts.append(t)
 
         t, q, u = np.asarray(ts) / 1e9, np.asarray(qs), np.asarray(us)
 
-        # Interpolating with the standard dt.
-        t_interp = np.arange(t[0], t[-1], DATASET_DT)  # Assume t is sorted.
+        # Interpolating with the standard dt. Assume t is sorted.
+        t_interp = np.arange(t[0], t[-1], DATASET_DT)
 
         logger.debug("Points in dataset: {}; Points after interp: {}.".format(t.shape[0], t_interp.shape[0]))
 
@@ -75,18 +70,23 @@ class DynamicsDataset(Dataset):
         for i in range(u.shape[1]):
             u_interp[:, i] = np.interp(t_interp, t, u[:, i])
 
-        # visualize_data(t_interp, q_interp, u_interp)
-        return cls(q_interp, u_interp, dt=dt, history=history, DATASET_DT=DATASET_DT)
+        if plot:
+            visualize_data(t_interp, q_interp, u_interp)
+        return cls(q_interp, u_interp, dt, DATASET_DT, history)
 
     @classmethod
-    def from_pickle(cls, file_name, dt, DATASET_DT=0.02, history=1):
+    def from_pickle(cls, file_name, dt, DATASET_DT=0.02, history=1, plot=False):
 
         with open(file_name, 'rb') as f:
             full_data = pkl.load(f)
+            size = len(full_data)
 
-        return ConcatDataset(
-            [DynamicsDataset.from_dict(data, dt=dt, DATASET_DT=DATASET_DT, history=history)
-             for data in full_data.values()])
+        if size == 1:
+            return [DynamicsDataset.from_dict(data, dt, 
+                DATASET_DT, history, plot) for data in full_data.values()][0]
+        else:
+            return ConcatDataset([DynamicsDataset.from_dict(data, dt, 
+                DATASET_DT, history, plot) for data in full_data.values()])
 
     def __len__(self):
         return self.q.shape[0] - self.history
@@ -97,6 +97,8 @@ class DynamicsDataset(Dataset):
 
 
 def visualize_data(t, q, u, title=''):
+    q_labels = ['v.v_long', 'v.v_tran', 'w.w_psi', 'x.x', 'x.y', 'e.psi']
+    u_labels = ['u.u_a', 'u.u_steer']
 
     n = np.ceil(np.sqrt(len(q_labels) + len(u_labels))).astype(int)
     fig, axes = plt.subplots(n, n, sharex=True)
@@ -127,8 +129,8 @@ def q_local_to_global(q_local, track):
     return q_global
 
 
-def get_nominal_prediction(dynamics, q, u, dynamics_uses_frenet, track=None,
-                           vehicle_state=VehicleState(t=0)) -> np.ndarray:
+def get_nominal_prediction(dynamics, q, u, dynamics_uses_frenet, track=None,):
+                           # vehicle_state=VehicleState(t=0)) -> np.ndarray:
     if dynamics_uses_frenet:
         q = q_global_to_local(q, track)
 
@@ -180,77 +182,79 @@ class NoiseDataset(Dataset):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='')
 
-    parser.add_argument('--threshold', type=float, default=0.1, help='Maximum allowed error')
-    parser.add_argument('--dt', type=float, default=0.1, help='Discretization step for the nominal model')
-    parser.add_argument('--history', type=int, default=3, help='maximum size of the buffer')
-    parser.add_argument('--track_name', type=str, default='L_track_barc', help='name of the track')
-    parser.add_argument('--load_previous', action='store_true', help='load previous dataset instead')
+    parser.add_argument('--threshold',  type=float, default=0.1, help='Maximum allowed error')
+    parser.add_argument('--dt',         type=float, default=0.1, help='Discretization step for the nominal model')
+    parser.add_argument('--history',    type=int,   default=32,  help='maximum size of the buffer')
+    parser.add_argument('--track_name', type=str,   default='L_track_barc', help='name of the track')
+    parser.add_argument('--file_name',  type=str,   default='../data/validation/mpc_data.pkl', help='name of pickle file')
+    parser.add_argument('--visualize',  action='store_true',     help='visualize data before and after')
+    parser.add_argument('--load_prev',  action='store_true',     help='load previous dataset instead')
 
     params = vars(parser.parse_args())
+    load_prev  = params['load_prev']
+    visualize  = params['visualize']
+    file_name  = params['file_name']
     track_name = params['track_name']
     history = params['history']
     dt = params['dt']
 
-    track = mpclab_common.track.get_track(params['track_name'])
+    # track = mpclab_common.track.get_track(params['track_name'])
+    # dynamics_config = DynamicBicycleConfig(dt=dt,
+    #     track_name=track_name, mass=2.92, yaw_inertia=0.13323)
+    # dynamics = CasadiDynamicCLBicycle(t0=0, model_config=dynamics_config)
+    # dynamics_uses_frenet = True
 
-    dynamics_config = DynamicBicycleConfig(dt=dt,
-        track_name=track_name, mass=2.92, yaw_inertia=0.13323)
-    dynamics = CasadiDynamicCLBicycle(t0=0, model_config=dynamics_config)
-    dynamics_uses_frenet = True
-
-    file_name = '../data/training/rosbag_data.pkl'
-    if params['load_previous']:
-
-        with open(f"../data/noise_dataset_old_{history}.pkl", "rb") as f:
+    if load_prev:
+        with open(file_name, "rb") as f:
             noise_dataset = pkl.load(f)
     else:
-        dynamics_dataset = DynamicsDataset.from_pickle(file_name, dt=dt, history=history)
-        noise_dataset = NoiseDataset.from_dataset(dynamics_dataset, track, dynamics,
-            dynamics_uses_frenet=dynamics_uses_frenet, threshold=params['threshold'])
+        dynamics_dataset = DynamicsDataset.from_pickle(file_name, dt, history=history, plot=visualize)
         
-        with open(f"../data/noise_dataset_old_{history}.pkl", "wb") as f:
-            pkl.dump(noise_dataset, f)
+        # noise_dataset = NoiseDataset.from_dataset(dynamics_dataset, track, dynamics,
+        #     dynamics_uses_frenet=dynamics_uses_frenet, threshold=params['threshold'])
+        # with open(f"../data/noise_dataset_old_{history}.pkl", "wb") as f:
+        #     pkl.dump(noise_dataset, f)
 
-    x, y, z, dx, dy = [], [], [], [], []
+    if visualize:
+        x, y, z, dx, dy = [], [], [], [], []
 
-    for q, u, dq in noise_dataset:
-        err = np.linalg.norm((dq[3], dq[4]))
-        # if err > 0.2:
-        #     continue
-        x.append(q[-1][3])
-        y.append(q[-1][4])
-        z.append(err)
-        dx.append(dq[3])
-        dy.append(dq[4])
+        for q, u, dq in dynamics_dataset:
+            err = np.linalg.norm((dq[3], dq[4]))
+            # if err > 0.2:
+            #     continue
+            x.append(q[-1][3])
+            y.append(q[-1][4])
+            z.append(err)
+            dx.append(dq[3])
+            dy.append(dq[4])
 
-    fig = plt.figure()
-    ax_3d = fig.add_subplot(2, 2, 1, projection='3d')
-    ax_norm = fig.add_subplot(2, 2, 2)
-    ax_x = fig.add_subplot(2, 2, 3)
-    ax_y = fig.add_subplot(2, 2, 4)
+        fig = plt.figure()
+        ax_3d = fig.add_subplot(2, 2, 1, projection='3d')
+        ax_norm = fig.add_subplot(2, 2, 2)
+        ax_x = fig.add_subplot(2, 2, 3)
+        ax_y = fig.add_subplot(2, 2, 4)
 
-    ax_3d.scatter(x, y, z, c='k', linestyle='-', marker='.')
-    ax_3d.set_title('Distribution of l-2 norm of prediction error')
-    ax_3d.set_xlabel('x (m)')
-    ax_3d.set_ylabel('y (m)')
-    ax_3d.set_zlabel('error (m)')
+        ax_3d.scatter(x, y, z, c='k', linestyle='-', marker='.')
+        ax_3d.set_title('Distribution of l-2 norm of prediction error')
+        ax_3d.set_xlabel('x (m)')
+        ax_3d.set_ylabel('y (m)')
+        ax_3d.set_zlabel('error (m)')
 
-    # ax_hist.hist(z)
-    hist = sns.histplot(data=z, ax=ax_norm)
-    hist.set(xlabel='l-2 norm of error')
-    labels = [str(v) if v else '' for v in hist.containers[0].datavalues]
-    hist.bar_label(hist.containers[0], label=labels)
-    ax_norm.set_title("Error Norm Distribution")
+        hist = sns.histplot(data=z, ax=ax_norm)
+        hist.set(xlabel='l-2 norm of error')
+        labels = [str(v) if v else '' for v in hist.containers[0].datavalues]
+        hist.bar_label(hist.containers[0], label=labels)
+        ax_norm.set_title("Error Norm Distribution")
 
-    hist_x = sns.histplot(data=dx, ax=ax_x)
-    hist_x.set(xlabel='x error')
-    labels = [str(v) if v else '' for v in hist_x.containers[0].datavalues]
-    hist_x.bar_label(hist_x.containers[0], label=labels)
-    ax_x.set_title("X-Error Distribution")
+        hist_x = sns.histplot(data=dx, ax=ax_x)
+        hist_x.set(xlabel='x error')
+        labels = [str(v) if v else '' for v in hist_x.containers[0].datavalues]
+        hist_x.bar_label(hist_x.containers[0], label=labels)
+        ax_x.set_title("X-Error Distribution")
 
-    hist_y = sns.histplot(data=dy, ax=ax_y)
-    hist_y.set(xlabel='y error')
-    labels = [str(v) if v else '' for v in hist_y.containers[0].datavalues]
-    hist_y.bar_label(hist_y.containers[0], label=labels)
-    ax_y.set_title("Y-Error Distribution")
-    plt.show()
+        hist_y = sns.histplot(data=dy, ax=ax_y)
+        hist_y.set(xlabel='y error')
+        labels = [str(v) if v else '' for v in hist_y.containers[0].datavalues]
+        hist_y.bar_label(hist_y.containers[0], label=labels)
+        ax_y.set_title("Y-Error Distribution")
+        plt.show()
