@@ -38,19 +38,19 @@ class FeedforwardNoiseModel(nn.Module):
         input_tensor = torch.concat([q, u], dim=-1)
         output = self.model(input_tensor)
         mu, logvar = output.split(self.state_size, dim=1)
-        self.logger.debug(f'mu: {mu}, logvar: {logvar}')
-        distribution = torch.distributions.Normal(mu, torch.nn.functional.softplus(logvar))
-        return distribution.rsample()
+        # self.logger.debug(f'mu: {mu}, logvar: {logvar}')
+        distribution = torch.distributions.Normal(mu, torch.nn.functional.softplus(logvar) + 1e-9)
+        return distribution
 
-    def get_prediction(self, q: np.ndarray, u: np.ndarray) -> np.ndarray:
+    def get_prediction(self, q: np.ndarray, u: np.ndarray, sample=True) -> np.ndarray:
         q, u = ptu.from_numpy(q), ptu.from_numpy(u)
         # q, u = ptu.from_numpy(q).unsqueeze(1), ptu.from_numpy(u).unsqueeze(1)
-        return ptu.to_numpy(self(q, u))
+        return ptu.to_numpy(self(q, u).sample() if sample else self(q, u).mean)
 
-    def export(self, path='../model_data', name='noise_model.pkl'):
+    def export(self, path='../model_data', name='dynamics_model.pkl'):
         torch.save(self.model.state_dict(), os.path.join(path, name))
 
-    def load(self, path='../model_data', name='noise_model.pkl'):
+    def load(self, path='../model_data', name='dynamics_model.pkl'):
         self.model.load_state_dict(torch.load(os.path.join(path, name)))
         self.model.to(ptu.device)
 

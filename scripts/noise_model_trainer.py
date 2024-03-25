@@ -49,7 +49,11 @@ class ModelTrainer:
             u = u.view(u.size(0), -1).type(torch.FloatTensor).to(ptu.device)
             dq = dq.type(torch.FloatTensor).to(ptu.device)
             self.optimizer.zero_grad()
-            pred = self.model(q, u)
+            output = self.model(q, u)
+            pred = output.rsample()
+
+            # loss = output.log_prob(dq).mean()
+            # loss = -(output.log_prob(dq) * torch.tensor([1, 1, 1, 10, 10, 10]).to(ptu.device)).mean()
             loss = self.loss(pred, dq)
             loss.backward()
             self.optimizer.step()
@@ -64,8 +68,11 @@ class ModelTrainer:
                 q = q.view(q.size(0), -1).type(torch.FloatTensor).to(ptu.device)
                 u = u.view(u.size(0), -1).type(torch.FloatTensor).to(ptu.device)
                 dq = dq.type(torch.FloatTensor).to(ptu.device)
-                pred = self.model(q, u)
+                output = self.model(q, u)
+                pred = output.sample()
                 loss = self.loss(pred, dq)
+                # loss = output.log_prob(dq).mean()
+                # loss = -(output.log_prob(dq) * torch.tensor([1, 1, 1, 10, 10, 10]).to(ptu.device)).mean()
                 val_losses.append(loss.item())
         mean_val_loss = np.mean(val_losses)
         self.scheduler.step()
@@ -102,17 +109,17 @@ class ModelTrainer:
 def get_data(behavior='noise', noise_threshold=0.1):
     dataset = None
     if behavior == 'noise':
-        # pickle_file_name = f"../data/noise_dataset_old_{params['history']}.pkl"
-        # if os.path.exists(pickle_file_name):
-        #     with open(pickle_file_name, 'rb') as f:
-        #         dataset = pkl.load(f)
-        # else:
-        dynamics_dataset = DynamicsDataset.from_pickle('../data/old_data.pkl', dt=params['dt'],
-                                                       history=params['history'])
-        dataset = NoiseDataset.from_dataset(dynamics_dataset, track, dynamics, dynamics_uses_frenet,
-                                            threshold=noise_threshold)
-        # with open(f"../data/noise_dataset_old_{params['history']}.pkl", 'wb') as f:
-        #     pkl.dump(dataset, f)
+        pickle_file_name = f"../data/noise_dataset_old_{params['history']}.pkl"
+        if os.path.exists(pickle_file_name):
+            with open(pickle_file_name, 'rb') as f:
+                dataset = pkl.load(f)
+        else:
+            dynamics_dataset = DynamicsDataset.from_pickle('../data/old_data.pkl', dt=params['dt'],
+                                                           history=params['history'])
+            dataset = NoiseDataset.from_dataset(dynamics_dataset, track, dynamics, dynamics_uses_frenet,
+                                                threshold=noise_threshold)
+        with open(f"../data/noise_dataset_old_{params['history']}.pkl", 'wb') as f:
+            pkl.dump(dataset, f)
 
     elif behavior == 'dynamics':
         dataset = DynamicsDataset.from_pickle('../data/old_data.pkl', dt=params['dt'],
@@ -167,7 +174,8 @@ if __name__ == '__main__':
 
     model = FeedforwardNoiseModel(state_size=len(q_labels), action_size=len(u_labels), **params)
     dataset = get_data(behavior=params['behavior'], noise_threshold=params['noise_threshold'])
-    trainer = ModelTrainer(model, lr=params['lr'], no_logging=params['no_logging'], comment=params['comment'])
+    trainer = ModelTrainer(model, lr=params['lr'], no_logging=params['no_logging'], comment=params['comment'],
+                           behavior=params['behavior'])
     try:
         trainer.training_main(dataset, **params)
     finally:

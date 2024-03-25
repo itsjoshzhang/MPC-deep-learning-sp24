@@ -17,10 +17,10 @@ logger = setup_custom_logger('test')
 
 
 def prepare_components(history,
-                       track_name='L_track_barc',
+                       size,
+                       n_layers,
                        dt=0.1,
-                       size=32,
-                       n_layers=2,
+                       track_name='L_track_barc',
                        activation='tanh',
                        output_activation='identity',
                        behavior='noise',
@@ -67,17 +67,22 @@ def prepare_dataset(file_name, dt=0.1, **params):
 
 
 def run_dynamics_model(model, dynamics_dataset, open_loop: bool):
-    q_data, q_nominal, q_noised = [], [], []
-    labels = ['data', 'nominal', 'with noise']
+    q_data = []
+    # q_nominal = []
+    q_noised = []
+    labels = ['data',
+              # 'nominal',
+              'with noise'
+              ]
 
     for step, (q, u, _) in enumerate(dynamics_dataset):
         try:
             q_data.append(q[-1])
 
-            if len(q_nominal) == 0:
-                q_nominal.append(q[-1])
-            else:
-                q_nominal.append(model.get_nominal_prediction(q_nominal[-1] if open_loop else q[-1], u[-1]))
+            # if len(q_nominal) == 0:
+            #     q_nominal.append(q[-1])
+            # else:
+            #     q_nominal.append(model.get_nominal_prediction(q_nominal[-1] if open_loop else q[-1], u[-1]))
 
             if len(q_noised) == 0:
                 q_noised.append(q[-1])
@@ -86,7 +91,10 @@ def run_dynamics_model(model, dynamics_dataset, open_loop: bool):
         except ValueError as e:
             logger.error(f"'{e}' at step {step}.")
             break
-    return (q_data, q_nominal, q_noised), labels
+    return (q_data,
+            # q_nominal,
+            q_noised
+            ), labels
 
 
 def visualize_trajectories(trajectories, labels, save_plots, *args):

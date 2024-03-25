@@ -37,6 +37,7 @@ class DynamicsDataset(Dataset):
         # self.u = u[::step]
         u = u[:(u.shape[0] - (u.shape[0] % step))]
         self.u = np.mean(u.reshape(-1, step, u.shape[1]), axis=1)
+
         self.history = history
         assert self.q.shape[0] >= self.history, (f"Dataset is too short. "
                                                  f"Found {self.q.shape[0]} entries, while history is {self.history}. ")
